@@ -138,7 +138,7 @@ export class MonitoringService {
     const results: Record<string, string> = {};
 
     const redis = await this.pingPort(6379) ? 'работает' : 'нет связи';
-    const db = await this.pingPort(5432) ? 'работает' : 'нет связи';
+    const db = await this.pingPort(5433) ? 'работает' : 'нет связи';
     const auth = await this.checkDockerContainer('auth-service');
     const user = await this.checkDockerContainer('user-service');
 
