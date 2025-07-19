@@ -8,6 +8,7 @@ interface Threshold {
 
 export default function Thresholds() {
   const [thresholds, setThresholds] = useState<Threshold[]>([]);
+  const [editedThresholds, setEditedThresholds] = useState<Record<string, number>>({});
   const [error, setError] = useState('');
   const [newThreshold, setNewThreshold] = useState<{ type: string; value: number }>({ type: '', value: 0 });
 
@@ -19,6 +20,7 @@ export default function Thresholds() {
       });
       const data = await res.json();
       setThresholds(data);
+      setEditedThresholds(Object.fromEntries(data.map((t: Threshold) => [t.type, t.value])));
     } catch {
       setError('Ошибка получения порогов');
     }
@@ -93,28 +95,38 @@ export default function Thresholds() {
           </tr>
         </thead>
         <tbody>
-          {thresholds.map((t) => (
-            <tr key={t.id} className="border-t">
-              <td className="p-2 capitalize">{t.type}</td>
-              <td className="p-2">
-                <input
-                  type="number"
-                  value={t.value}
-                  onChange={(e) => updateThreshold(t.type, Number(e.target.value))}
-                  className="border rounded px-2 py-1 w-20"
-                />
-              </td>
-              <td className="p-2 text-sm text-gray-500">
-                <span>Изменения применяются сразу</span>
-                <button
-                  onClick={() => deleteThreshold(t.type)}
-                  className="ml-4 text-red-500 hover:underline"
-                >
-                  Удалить
-                </button>
-              </td>
-            </tr>
-          ))}
+          {thresholds
+            .slice()
+            .sort((a, b) => a.type.localeCompare(b.type)) // стабилизация порядка
+            .map((t) => (
+              <tr key={t.id} className="border-t">
+                <td className="p-2 capitalize">{t.type}</td>
+                <td className="p-2">
+                  <input
+                    type="number"
+                    value={editedThresholds[t.type] ?? t.value}
+                    onChange={(e) =>
+                      setEditedThresholds({ ...editedThresholds, [t.type]: Number(e.target.value) })
+                    }
+                    onBlur={() => {
+                      if (editedThresholds[t.type] !== t.value) {
+                        updateThreshold(t.type, editedThresholds[t.type]);
+                      }
+                    }}
+                    className="border rounded px-2 py-1 w-20"
+                  />
+                </td>
+                <td className="p-2 text-sm text-gray-500">
+                  <span>Изменения применяются сразу</span>
+                  <button
+                    onClick={() => deleteThreshold(t.type)}
+                    className="ml-4 text-red-500 hover:underline"
+                  >
+                    Удалить
+                  </button>
+                </td>
+              </tr>
+            ))}
         </tbody>
       </table>
 
@@ -146,7 +158,9 @@ export default function Thresholds() {
           </button>
         </div>
         {usedTypes.includes(newThreshold.type) && newThreshold.type && (
-          <div className="text-sm text-red-500 mt-2">Порог для {newThreshold.type.toUpperCase()} уже существует</div>
+          <div className="text-sm text-red-500 mt-2">
+            Порог для {newThreshold.type.toUpperCase()} уже существует
+          </div>
         )}
       </div>
     </div>
