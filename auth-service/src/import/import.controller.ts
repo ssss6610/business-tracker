@@ -28,4 +28,15 @@ export class ImportController {
   async confirmBitrixImport(@Body() users: ImportedUserDto[]) {
     return await this.importService.importAndCreateUsers(users);
   }
+  @Post('clients')
+  @UseInterceptors(FileInterceptor('file'))
+  async previewClients(@UploadedFile() file: any) {
+  return this.importService.previewClients(file);
+}
+
+  @Post('clients/confirm')
+  async confirmClients(@Body() users: ImportedUserDto[]) {
+  return this.importService.importClients(users);
+}
+
 }

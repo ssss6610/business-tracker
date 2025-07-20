@@ -5,6 +5,7 @@ import { FaUserEdit, FaTrash, FaSave, FaPlus } from "react-icons/fa";
 import { MdEdit, MdCancel } from "react-icons/md";
 import { SiBraintree, SiJira, SiApache } from "react-icons/si"; // Bitrix, Jira, TrackStudio (Apache icon как заглушка)
 import Sidebar from '../components/Sidebar';
+import { getApiBase } from '../utils/getApiBase';
 
 ReactModal.setAppElement('#root');
 
@@ -37,7 +38,8 @@ export default function AdminPanel() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:3000/users', {
+      const baseUrl = await getApiBase();
+      const res= await axios.get(`${baseUrl}/users`,{
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsers(res.data);
@@ -59,7 +61,8 @@ export default function AdminPanel() {
   const handleCreateUser = async () => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:3000/users', {
+      const baseUrl = await getApiBase();
+      await axios.post(`${baseUrl}/users`, {
         login: newUser.login,
         email: newUser.email,
         role: newUser.role,
@@ -79,8 +82,9 @@ export default function AdminPanel() {
   const saveChanges = async () => {
     if (!selectedUser) return;
     const token = localStorage.getItem('token');
+    const baseUrl = await getApiBase();
     await axios.patch(
-      `http://localhost:3000/users/${selectedUser.id}`,
+      `${baseUrl}/users/${selectedUser.id}`,
       {
         login: selectedUser.login,
         email: selectedUser.email,
@@ -97,7 +101,8 @@ export default function AdminPanel() {
   const confirmDelete = async () => {
     if (!selectedUser) return;
     const token = localStorage.getItem('token');
-    await axios.delete(`http://localhost:3000/users/${selectedUser.id}`, {
+    const baseUrl = await getApiBase();
+    await axios.delete(`${baseUrl}/users/${selectedUser.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setShowDeleteModal(false);
@@ -113,7 +118,8 @@ const handleImport = async () => {
   const token = localStorage.getItem('token');
 
   try {
-    const res = await axios.post('http://localhost:3000/import/bitrix', formData, {
+    const baseUrl = await getApiBase();
+    const res = await axios.post(`${baseUrl}/import/bitrix`, formData, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'multipart/form-data',
@@ -129,7 +135,8 @@ const handleConfirmImport = async () => {
   const token = localStorage.getItem('token');
 
   try {
-    await axios.post('http://localhost:3000/import/bitrix/confirm', previewUsers, {
+    const baseUrl = await getApiBase();
+    await axios.post(`${baseUrl}/import/bitrix/confirm`, previewUsers, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -389,7 +396,7 @@ const handleConfirmImport = async () => {
   {selectedSource === 'bitrix24' && (
     <input
       type="file"
-      accept=".csv"
+      accept=".xls"
       onChange={(e) => setImportFile(e.target.files?.[0] || null)}
       className="w-full border p-2 rounded mb-4"
     />

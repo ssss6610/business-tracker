@@ -6,6 +6,7 @@ import Monitoring from './pages/Monitoring';
 import Roles from './pages/Roles';
 import Thresholds from './pages/Thresholds'
 import AdminLayout from './layouts/AdminLayout';
+import TrackerSettings from'./pages/TrackerSettings' ;
 
 function App() {
   return (
@@ -21,6 +22,8 @@ function App() {
           <Route path="/monitoring" element={<Monitoring />} />
           <Route path="/roles" element={<Roles />} />
           <Route path="/thresholds" element={<Thresholds />} />
+          <Route path="/tracker" element={<TrackerSettings />} />
+
         </Route>
       </Routes>
     </BrowserRouter>

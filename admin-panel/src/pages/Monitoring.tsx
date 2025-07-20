@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getApiBase } from '../utils/getApiBase';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -38,7 +39,8 @@ export default function Monitoring() {
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3000/monitoring', {
+      const baseUrl = await getApiBase();
+      const res =await fetch(`${baseUrl}/monitoring`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -51,7 +53,8 @@ export default function Monitoring() {
   const fetchTopProcesses = async () => {
   try {
     const token = localStorage.getItem('token');
-    const res = await fetch('http://localhost:3000/monitoring/top-processes', {
+      const baseUrl = await getApiBase();
+      const res = await fetch(`${baseUrl}/monitoring/top-processes`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
@@ -68,22 +71,25 @@ useEffect(() => {
 }, []);
 
 
-  const fetchAlerts = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3000/monitoring/alerts', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setAlerts(data);
-    } catch {
-      setError('Ошибка получения алертов');
-    }
-  };
+const fetchAlerts = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const baseUrl = await getApiBase();
+    const res = await fetch(`${baseUrl}/monitoring/alerts`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    setAlerts(Array.isArray(data) ? data : []);
+  } catch {
+    setError('Ошибка получения алертов');
+  }
+};
+
 
   const markAllAsRead = async () => {
     const token = localStorage.getItem('token');
-    await fetch('http://localhost:3000/monitoring/alerts/mark-read', {
+      const baseUrl = await getApiBase();
+      await fetch(`${baseUrl}/monitoring/alerts/mark-read`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -92,7 +98,8 @@ useEffect(() => {
 
   const deleteAllAlerts = async () => {
     const token = localStorage.getItem('token');
-    await fetch('http://localhost:3000/monitoring/alerts/clear', {
+      const baseUrl = await getApiBase();
+      await fetch(`${baseUrl}/monitoring/alerts/clear`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -109,13 +116,14 @@ useEffect(() => {
     const fetchServiceHistory = async (service: string) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/monitoring/services/${service}/history`, {
+      const baseUrl = await getApiBase();
+      const res = await fetch(`${baseUrl}/monitoring/services/${service}/history`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       console.log(`[История ${service}]`, data); // ⬅️ лог
       setServiceHistories((prev) => ({ ...prev, [service]: data }));
-    } catch {
+    } catch(err) {
       console.error(`Ошибка истории сервиса ${service}`, err); // ⬅️ лог ошибки
       setError(`Ошибка истории сервиса ${service}`);
     }

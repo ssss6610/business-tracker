@@ -5,6 +5,7 @@ import { UserService } from '../user/user.service';
 import { normalizeUser } from './utils/normalize-user.util';
 import { Role, UserType } from '../user/user.entity/user.entity';
 import { parseEmployeeXls } from './parsers/bitrix.parser';
+import { parseClientsCsv } from './parsers/clients.parser';
 import { Express } from 'express';
 @Injectable()
 export class ImportService {
@@ -57,4 +58,39 @@ for (const raw of users) {
       users: created,
     };
   }
+  async previewClients(file:any): Promise<ImportedUserDto[]> {
+  const raw = await parseClientsCsv(file.path);
+  return raw.map(normalizeUser);
+}
+
+async importClients(users: ImportedUserDto[]) {
+  const created: CreateUserDto[] = [];
+  const tempPassword = 'temp12345';
+
+  for (const raw of users) {
+    const normalized = normalizeUser(raw);
+    if (!normalized.email || !normalized.fullName) continue;
+
+    const dto: CreateUserDto = {
+      login: normalized.email.split('@')[0],
+      email: normalized.email,
+      password: tempPassword,
+      role: Role.User,
+      mustChangePassword: true,
+      userType: UserType.Client, // 👈 отличие от сотрудников
+    };
+
+    try {
+      await this.userService.create(dto);
+      created.push(dto);
+    } catch (e) {
+      console.warn('Ошибка при создании клиента:', dto, e.message);
+    }
+  }
+
+  return {
+    count: created.length,
+    users: created,
+  };
+}
 }

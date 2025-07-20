@@ -1,6 +1,7 @@
 // src/pages/Setup.tsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getApiBase } from '../utils/getApiBase';
 
 export default function Setup() {
   const [email, setEmail] = useState('');
@@ -19,7 +20,8 @@ const handleSubmit = async (e: React.FormEvent) => {
   }
 
   try {
-    const response = await fetch('http://localhost:3000/setup', {
+      const base = await getApiBase();
+      const response = await fetch(`${base}/setup`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -15,6 +15,7 @@ export async function parseEmployeeXls(filePath: string): Promise<ImportedUserDt
     position: '', // в файле нет → оставим пустым
     department: row['Подразделение'] || '',                   // ✅
     source: 'bitrix24',
+    userType: 'employee',
   }));
 
   return users;

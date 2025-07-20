@@ -7,4 +7,5 @@ export class ImportedUserDto {
   position?: string;  // Должность
   department?: string; // Отдел
   source: 'bitrix24' | 'trackstudio' | 'jira'; // Источник
+  userType: 'employee' | 'client'; // 👈 добавили
 }

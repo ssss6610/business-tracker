@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getApiBase } from '../utils/getApiBase';
 
 interface Threshold {
   id: number;
@@ -15,7 +16,8 @@ export default function Thresholds() {
   const fetchThresholds = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3000/monitoring/thresholds', {
+      const base = await getApiBase();
+      const res = await fetch(`${base}/monitoring/thresholds`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -29,7 +31,8 @@ export default function Thresholds() {
   const updateThreshold = async (type: string, value: number) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:3000/monitoring/thresholds/${type}`, {
+      const base = await getApiBase();
+      await fetch(`${base}/monitoring/thresholds/${type}`,{
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -46,7 +49,8 @@ export default function Thresholds() {
   const createThreshold = async () => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:3000/monitoring/thresholds`, {
+      const base = await getApiBase();
+      await fetch(`${base}/monitoring/thresholds`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,7 +68,8 @@ export default function Thresholds() {
   const deleteThreshold = async (type: string) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:3000/monitoring/thresholds/${type}`, {
+      const base = await getApiBase();
+      await fetch(`${base}/monitoring/thresholds/${type}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
