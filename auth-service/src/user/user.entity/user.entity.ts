@@ -32,6 +32,7 @@ export class User {
 
   @Column({ default: false })
   isInitialSetupCompleted: boolean;
-  
-  mustChangePassword?: boolean; // 👈 опционально
+
+  @Column({ default: false })
+  mustChangePassword: boolean;
 }

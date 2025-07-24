@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User, Role } from './user.entity/user.entity';
+import { User, Role , UserType} from './user.entity/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcryptjs';
@@ -55,11 +55,12 @@ async create(dto: CreateUserDto): Promise<User> {
   const hashedPassword = await bcrypt.hash(dto.password, 10);
 
   const user = this.userRepository.create({
-    login: dto.login,
-    email: dto.email,
-    role: dto.role,
-    password: hashedPassword,
-    mustChangePassword: dto.mustChangePassword ?? false, // 👈 важно!
+  login: dto.login,
+  email: dto.email,
+  role: dto.role,
+  password: hashedPassword,
+  userType: dto.userType ?? UserType.Employee, // 👈 по умолчанию сотрудник
+  mustChangePassword: dto.mustChangePassword ?? true,
   });
 
   return this.userRepository.save(user);
@@ -82,6 +83,9 @@ async remove(id: number): Promise<void> {
 }
 
 async findById(id: number): Promise<User> {
-  return this.userRepository.findOneBy({ id });
+  const user = await this.userRepository.findOneBy({ id });
+  if (!user) throw new Error('Пользователь не найден');
+  return user;
 }
+
 }

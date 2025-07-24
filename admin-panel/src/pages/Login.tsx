@@ -25,14 +25,18 @@ export default function Login() {
 
       localStorage.setItem('token', token);
 
-      const decoded: any = jwtDecode(token);
-      console.log('🔐 Декодированный токен:', decoded);
+const decoded: any = jwtDecode(token);
+console.log('🔐 Декодированный токен:', decoded);
 
-      if (decoded.setup) {
-        navigate('/setup');
-      } else {
-        navigate('/admin');
-      }
+if (decoded.setup && decoded.role === 'admin') {
+  navigate('/setup'); // мастер настройки
+} else if (decoded.setup) {
+  navigate('/change-password'); // смена пароля для обычных пользователей
+} else if (decoded.role === 'admin') {
+  navigate('/admin'); // админ-панель
+} else {
+  navigate('/workspace'); // рабочее пространство
+}
     } catch (err: any) {
       console.error('❌ Ошибка логина:', err);
       setError('Неверный логин или пароль');

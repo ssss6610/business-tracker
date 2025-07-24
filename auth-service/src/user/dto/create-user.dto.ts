@@ -15,7 +15,8 @@ export class CreateUserDto {
   role: Role;
 
   @IsEnum(UserType)
-  userType: UserType;
+  @IsOptional()
+  userType?: UserType;
 
   @IsOptional()
   mustChangePassword?: boolean; // 👈 Добавляем это поле

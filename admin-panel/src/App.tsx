@@ -7,6 +7,8 @@ import Roles from './pages/Roles';
 import Thresholds from './pages/Thresholds'
 import AdminLayout from './layouts/AdminLayout';
 import TrackerSettings from'./pages/TrackerSettings' ;
+import ChangePassword from './pages/ChangePassword';
+import Workspace from'./pages/Workspace';
 
 function App() {
   return (
@@ -15,6 +17,8 @@ function App() {
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<Login />} />
         <Route path="/setup" element={<Setup />} />
+        <Route path="/change-password" element={<ChangePassword />} />
+        <Route path="/workspace" element={<Workspace />} />
 
         {/* Все защищённые маршруты внутри AdminLayout */}
         <Route path="/" element={<AdminLayout />}>
