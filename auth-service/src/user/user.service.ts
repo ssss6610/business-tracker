@@ -80,4 +80,8 @@ async update(id: number, dto: UpdateUserDto): Promise<User> {
 async remove(id: number): Promise<void> {
   await this.userRepository.delete(id);
 }
+
+async findById(id: number): Promise<User> {
+  return this.userRepository.findOneBy({ id });
+}
 }

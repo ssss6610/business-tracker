@@ -47,4 +47,19 @@ async validateUser(login: string, pass: string) {
       access_token: this.jwtService.sign(payload),
     };
   }
+
+  async changePassword(userId: number, dto: ChangePasswordDto) {
+  const user = await this.userService.findById(userId);
+
+  const isMatch = await bcrypt.compare(dto.oldPassword, user.password);
+  if (!isMatch) {
+    throw new Error('Старый пароль неверный');
+  }
+
+  const hashed = await bcrypt.hash(dto.newPassword, 10);
+  user.password = hashed;
+  user.mustChangePassword = false;
+  user.isInitialSetupCompleted = true;
+
+  await this.userService.save(user);
 }
