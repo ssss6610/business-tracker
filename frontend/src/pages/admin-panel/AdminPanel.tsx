@@ -4,8 +4,7 @@ import ReactModal from 'react-modal';
 import { FaUserEdit, FaTrash, FaSave, FaPlus } from "react-icons/fa";
 import { MdEdit, MdCancel } from "react-icons/md";
 import { SiBraintree, SiJira, SiApache } from "react-icons/si"; // Bitrix, Jira, TrackStudio (Apache icon как заглушка)
-import Sidebar from '../components/Sidebar';
-import { getApiBase } from '../utils/getApiBase';
+import { getApiBase } from '../../utils/getApiBase';
 
 ReactModal.setAppElement('#root');
 

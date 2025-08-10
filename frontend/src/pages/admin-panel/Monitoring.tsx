@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getApiBase } from '../utils/getApiBase';
+import { getApiBase } from '../../utils/getApiBase';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,

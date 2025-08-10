@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getApiBase } from '../utils/getApiBase';
+import { getApiBase } from '../../utils/getApiBase';
 
 interface Threshold {
   id: number;
