@@ -4,11 +4,11 @@ import Login from './pages/Login';
 import Setup from './pages/Setup';
 import ChangePassword from './pages/ChangePassword';
 
-import AdminPanel from './pages/AdminPanel';
-import Monitoring from './pages/Monitoring';
-import Roles from './pages/Roles';
-import Thresholds from './pages/Thresholds';
-import TrackerSettings from './pages/TrackerSettings';
+import AdminPanel from './pages/admin-panel/AdminPanel';
+import Monitoring from './pages/admin-panel/Monitoring';
+import Roles from './pages/admin-panel/Roles';
+import Thresholds from './pages/admin-panel/Thresholds';
+import TrackerSettings from './pages/admin-panel/TrackerSettings';
 
 import WorkspaceHome from './pages/workspace/WorkspaceHome';
 import ChatPage from './pages/workspace/ChatPage';
