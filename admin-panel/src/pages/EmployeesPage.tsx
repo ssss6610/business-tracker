@@ -1,7 +1,7 @@
 export default function EmployeesPage() {
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">Почта</h1>
+    <div>
+      <h1 className="text-2xl font-bold mb-4">Employees</h1>
       <p>Раздел в разработке...</p>
     </div>
   );
