@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { MdLogout, MdArrowBack, MdArrowForward, MdOutlineMonitorHeart, MdSettings } from 'react-icons/md';
 import { FaUsers, FaUserCog } from 'react-icons/fa';
+import { CirclePlus } from 'lucide-react';
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ export default function Sidebar() {
         {item('/admin', <FaUsers size={20}/>, 'Пользователи', { end: true })}
         {item('/admin/monitoring', <MdOutlineMonitorHeart size={20}/>, 'Мониторинг')}
         {item('/admin/roles', <FaUserCog size={20}/>, 'Роли')}
-        {item('/admin/thresholds', <FaUserCog size={20}/>, 'Пороги')}
+        {item('/admin/thresholds', <CirclePlus size={20}/>, 'Пороги')}
         {item('/admin/settings', <MdSettings size={20}/>, 'Настройки компании')}
       </nav>
 
