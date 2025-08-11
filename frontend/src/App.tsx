@@ -9,6 +9,7 @@ import Monitoring from './pages/admin-panel/Monitoring';
 import Roles from './pages/admin-panel/Roles';
 import Thresholds from './pages/admin-panel/Thresholds';
 import TrackerSettings from './pages/admin-panel/TrackerSettings';
+import CompanySettings from './pages/admin-panel/CompanySettings';
 
 import WorkspaceHome from './pages/workspace/WorkspaceHome';
 import ChatPage from './pages/workspace/ChatPage';
@@ -27,17 +28,14 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-
-        {/* 🔓 Публичные маршруты */}
+        {/* публичные */}
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<Login />} />
         <Route path="/setup" element={<Setup />} />
         <Route path="/change-password" element={<ChangePassword />} />
 
-        {/* 🔐 Приватные маршруты с AppLayout (логотип + аватар) */}
+        {/* WORKSPACE ветка: своя обёртка */}
         <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
-
-          {/* Workspace (с сайдбаром слева) */}
           <Route path="workspace" element={<WorkspaceLayout />}>
             <Route index element={<WorkspaceHome />} />
             <Route path="chat" element={<ChatPage />} />
@@ -47,17 +45,20 @@ function App() {
             <Route path="mail" element={<MailPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
           </Route>
-
-          {/* Admin (другая боковая панель) */}
-          <Route path="admin" element={<AdminLayout />}>
-            <Route index element={<AdminPanel />} />
-            <Route path="monitoring" element={<Monitoring />} />
-            <Route path="roles" element={<Roles />} />
-            <Route path="thresholds" element={<Thresholds />} />
-            <Route path="tracker" element={<TrackerSettings />} />
-          </Route>
-
         </Route>
+
+        {/* ADMIN ветка: отдельная обёртка, чтобы не было двойной шапки */}
+        <Route path="admin" element={<PrivateRoute><AdminLayout /></PrivateRoute>}>
+          <Route index element={<AdminPanel />} />
+          <Route path="monitoring" element={<Monitoring />} />
+          <Route path="roles" element={<Roles />} />
+          <Route path="thresholds" element={<Thresholds />} />
+          <Route path="tracker" element={<TrackerSettings />} />
+          <Route path="settings" element={<CompanySettings />} />
+        </Route>
+
+        {/* дефолт на админку (можешь сменить на workspace) */}
+        <Route path="*" element={<Navigate to="/admin" />} />
       </Routes>
     </BrowserRouter>
   );
