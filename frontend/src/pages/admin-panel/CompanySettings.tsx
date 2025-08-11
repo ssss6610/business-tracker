@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { getApiBase } from '../../utils/getApiBase';
+import { makeAbsoluteUrl } from '../../utils/assetUrl';
 import LogoUploader from '../../components/LogoUploader';
 
 type LogoFile = { file: File | null; preview: string | null };
 type CompanySettingsDto = { name: string; logoUrl?: string | null };
 
 type PersistenceMode = 'server' | 'local';
-
-const LS_KEY = 'companySettings'; // для локального режима
+const LS_KEY = 'companySettings';
 
 export default function CompanySettings() {
   const [form, setForm] = useState<CompanySettingsDto>({ name: '', logoUrl: null });
@@ -15,7 +15,7 @@ export default function CompanySettings() {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<PersistenceMode>('server'); // попытка через бэк, иначе локально
+  const [mode, setMode] = useState<PersistenceMode>('server');
 
   const initialRef = useRef<CompanySettingsDto | null>(null);
 
@@ -29,16 +29,15 @@ export default function CompanySettings() {
         const res = await fetch(`${baseUrl}/admin/company`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data: CompanySettingsDto = await res.json();
         const name = data.name ?? '';
-        const logoUrl = data.logoUrl ?? null;
+        const logoUrlAbs = await makeAbsoluteUrl(data.logoUrl ?? null);
 
-        setForm({ name, logoUrl });
-        initialRef.current = { name, logoUrl };
-        setMode('server'); // бэк доступен
+        setForm({ name, logoUrl: logoUrlAbs });
+        initialRef.current = { name, logoUrl: logoUrlAbs };
+        setMode('server');
       } catch {
         // Фоллбэк в локальный режим
         setMode('local');
@@ -66,10 +65,9 @@ export default function CompanySettings() {
     setSaved(false);
     setLoading(true);
     try {
-      let logoUrl = form.logoUrl ?? null;
+      let logoUrl: string | null = form.logoUrl ?? null;
 
       if (mode === 'server') {
-        // Серверный режим
         const token = localStorage.getItem('token');
         const baseUrl = await getApiBase();
 
@@ -83,21 +81,17 @@ export default function CompanySettings() {
           });
           if (!up.ok) throw new Error('Ошибка загрузки логотипа');
           const { url } = await up.json();
-          logoUrl = url;
+          logoUrl = url; // сервер вернул относительный путь /uploads/...
         }
 
         const res = await fetch(`${baseUrl}/admin/company`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ name: form.name.trim(), logoUrl }),
         });
         if (!res.ok) throw new Error('Не удалось сохранить настройки');
       } else {
-        // Локальный режим: кладём в localStorage
-        // Если пользователь выбрал новый логотип — используем превью (dataURL) как logoUrl
+        // локально храним dataURL превью, если выбрали новый файл
         if (logo?.file && logo.preview) {
           logoUrl = logo.preview;
         }
@@ -105,10 +99,20 @@ export default function CompanySettings() {
         localStorage.setItem(LS_KEY, JSON.stringify(toSave));
       }
 
+      // Приводим ссылку к абсолютной (или оставляем dataURL/abs как есть)
+      const absUrl = await makeAbsoluteUrl(logoUrl ?? null);
+
       setSaved(true);
       setLogo((prev) => (prev ? { ...prev, file: null } : prev));
-      initialRef.current = { name: form.name.trim(), logoUrl };
-      setForm((f) => ({ ...f, logoUrl }));
+      initialRef.current = { name: form.name.trim(), logoUrl: absUrl };
+      setForm((f) => ({ ...f, logoUrl: absUrl }));
+
+      // оповещаем лэйауты
+      window.dispatchEvent(
+        new CustomEvent<CompanySettingsDto>('company:updated', {
+          detail: { name: form.name.trim(), logoUrl: absUrl },
+        })
+      );
     } catch (e: any) {
       setError(e?.message ?? 'Ошибка сохранения');
     } finally {
@@ -137,9 +141,7 @@ export default function CompanySettings() {
 
       <div className="mt-6 rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-6 py-4">
-          <p className="text-sm text-gray-500">
-            Основные параметры, которые видны сотрудникам и клиентам.
-          </p>
+          <p className="text-sm text-gray-500">Основные параметры, которые видны сотрудникам и клиентам.</p>
         </div>
 
         <div className="space-y-6 px-6 py-6">
@@ -150,7 +152,7 @@ export default function CompanySettings() {
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               type="text"
-              placeholder="Например: ПрограмБанк"
+              placeholder="Например: Рога и копыта"
               className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
               aria-invalid={!isNameValid}
             />

@@ -52,7 +52,7 @@ export default function Sidebar() {
         {item('/admin/monitoring', <MdOutlineMonitorHeart size={20}/>, 'Мониторинг')}
         {item('/admin/roles', <FaUserCog size={20}/>, 'Роли')}
         {item('/admin/thresholds', <CirclePlus size={20}/>, 'Пороги')}
-        {item('/admin/settings', <MdSettings size={20}/>, 'Настройки компании')}
+        {item('/admin/settings', <MdSettings size={20}/>, 'Персонализация')}
       </nav>
 
       <div className="border-t border-gray-300 pt-4 w-full">

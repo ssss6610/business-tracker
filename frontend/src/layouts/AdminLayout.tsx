@@ -1,36 +1,60 @@
-import Sidebar from '../components/AdminSidebar';
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import Sidebar from '../components/AdminSidebar';
+import { fetchCompanySettings } from '../utils/companySettings';
+
+type CompanySettings = { name: string; logoUrl?: string | null };
 
 export default function AdminLayout() {
+  const [company, setCompany] = useState<CompanySettings>({ name: '', logoUrl: null });
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const data = await fetchCompanySettings();
+      if (mounted) setCompany(data);
+    })();
+
+    const onUpdated = (e: Event) => {
+      const detail = (e as CustomEvent<CompanySettings>).detail;
+      if (detail) setCompany(detail);
+      else fetchCompanySettings().then(setCompany).catch(() => {});
+    };
+
+    window.addEventListener('company:updated', onUpdated);
+    return () => {
+      mounted = false;
+      window.removeEventListener('company:updated', onUpdated);
+    };
+  }, []);
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Шапка — единственная */}
-      <header className="h-16 border-b bg-white flex items-center justify-between px-4">
-        <div className="flex items-center gap-2 font-bold text-lg">
-          <img
-            src={localStorage.getItem('companyLogo') || '/vite.svg'}
-            alt="logo"
-            className="w-8 h-8"
-          />
-          {localStorage.getItem('companyName') || 'Business Tracker'}
+      {/* ТОП-ХЕДЕР поверх всего */}
+      <header className="h-14 border-b bg-white flex items-center justify-between px-4">
+        <div className="flex items-center gap-3 min-w-0">
+          {company.logoUrl ? (
+            <img
+              src={company.logoUrl}
+              alt="Логотип компании"
+              className="h-8 w-8 rounded-full object-cover"
+              draggable={false}
+            />
+          ) : (
+            <div className="h-8 w-8 rounded-full bg-gray-200" />
+          )}
+          <span className="text-lg font-semibold truncate">
+            {company.name || 'Компания'}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm">ИП</div>
-          <span className="font-medium">Иван Петров</span>
-        </div>
+        {/* тут можно вставить UserMenu, кнопку выхода и т.д. */}
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <aside className="shrink-0">
-          <Sidebar />
-        </aside>
-
-        {/* Главная рабочая область со скроллом */}
-        <main className="flex-1 overflow-y-auto px-6 py-6">
-          {/* Не ограничивай страницы фиксированными h-screen внутри! */}
+      {/* НИЖЕ — область с сайдбаром слева */}
+      <div className="flex-1 flex min-h-0">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto">
           <Outlet />
-          {/* небольшой нижний отступ для комфортного скролла */}
-          <div className="h-8" />
         </main>
       </div>
     </div>
