@@ -30,6 +30,12 @@ export class User {
   @Column({ type: 'enum', enum: UserType, default: UserType.Employee })
   userType: UserType;
 
+  @ManyToOne(() => TrackerRole, { nullable: true })
+  trackerRole?: TrackerRole | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  department?: string | null;
+
   @Column({ default: false })
   isInitialSetupCompleted: boolean;
 

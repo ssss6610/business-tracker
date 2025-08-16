@@ -7,6 +7,7 @@ import { MonitoringModule } from './monitoring/monitoring.module';
 import { SetupModule } from './setup/setup.module';
 import { ImportModule } from './import/import.module';
 import { CompanyModule } from './company/company.module';
+import { TrackerModule } from './tracker/tracker.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { CompanyModule } from './company/company.module';
     MonitoringModule,
     ImportModule,
     CompanyModule,
+    TrackerModule,
   ],
 })
 export class AppModule {}
