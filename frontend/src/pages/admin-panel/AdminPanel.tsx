@@ -3,20 +3,34 @@ import axios from 'axios';
 import ReactModal from 'react-modal';
 import { FaUserEdit, FaTrash, FaSave, FaPlus } from "react-icons/fa";
 import { MdEdit, MdCancel } from "react-icons/md";
-import { SiBraintree, SiJira, SiApache } from "react-icons/si"; // Bitrix, Jira, TrackStudio (Apache icon как заглушка)
+import { SiBraintree, SiJira, SiApache } from "react-icons/si";
 import { getApiBase } from '../../utils/getApiBase';
 
 ReactModal.setAppElement('#root');
+
+type BaseRole = 'admin' | 'user';
 
 interface User {
   id: number;
   login: string;
   email: string;
-  role: string;
+  role: BaseRole;
+  trackerRoleId?: number | null;   // 👈 ID роли трекера
+  trackerRoleTitle?: string | null;// (опционально приходит с бэка)
+  department?: string | null;      // 👈 отдел
+}
+
+interface TrackerRole { id: number; title: string; }
+
+interface ImportedUserDto {
+  fullName: string;
+  email: string;
+  source: string;
 }
 
 export default function AdminPanel() {
   const [users, setUsers] = useState<User[]>([]);
+  const [rolesT, setRolesT] = useState<TrackerRole[]>([]);
   const [error, setError] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -26,29 +40,51 @@ export default function AdminPanel() {
   const [previewUsers, setPreviewUsers] = useState<ImportedUserDto[]>([]);
   const [selectedSource, setSelectedSource] = useState<'bitrix24' | 'trackstudio' | 'jira'>('bitrix24');
   const [importFile, setImportFile] = useState<File | null>(null);
+
   const [newUser, setNewUser] = useState<User & { password: string }>({
     id: 0,
     login: '',
     email: '',
     role: 'user',
     password: '',
+    trackerRoleId: 0, // 0 = «нет роли»
+    department: '',
   });
+
+  const withAuth = async () => {
+    const token = localStorage.getItem('token');
+    const baseUrl = await getApiBase();
+    return { baseUrl, headers: { Authorization: `Bearer ${token}` } };
+  };
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const baseUrl = await getApiBase();
-      const res= await axios.get(`${baseUrl}/users`,{
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const { baseUrl, headers } = await withAuth();
+      const res = await axios.get(`${baseUrl}/users`, { headers });
       setUsers(res.data);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка загрузки пользователей');
     }
   };
 
+  const fetchTrackerRoles = async () => {
+    try {
+      const { baseUrl, headers } = await withAuth();
+      const res = await axios.get(`${baseUrl}/tracker/roles`, { headers });
+      // вставим «нет роли» как 0
+      setRolesT([{ id: 0, title: '— нет роли —' }, ...res.data]);
+    } catch {
+      // если бэк ещё не готов — дадим хотя бы «нет роли»
+      setRolesT([{ id: 0, title: '— нет роли —' }]);
+    }
+  };
+
   const handleEdit = (user: User) => {
-    setSelectedUser(user);
+    setSelectedUser({
+      ...user,
+      trackerRoleId: user.trackerRoleId ?? 0,
+      department: user.department ?? '',
+    });
     setShowEditModal(true);
   };
 
@@ -59,19 +95,18 @@ export default function AdminPanel() {
 
   const handleCreateUser = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const baseUrl = await getApiBase();
+      const { baseUrl, headers } = await withAuth();
       await axios.post(`${baseUrl}/users`, {
         login: newUser.login,
         email: newUser.email,
         role: newUser.role,
         password: newUser.password,
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+        trackerRoleId: newUser.trackerRoleId ? Number(newUser.trackerRoleId) : null,
+        department: newUser.department ? newUser.department.trim() : null,
+      }, { headers });
 
       setShowCreateModal(false);
-      setNewUser({ id: 0, login: '', email: '', role: 'user', password: '' });
+      setNewUser({ id: 0, login: '', email: '', role: 'user', password: '', trackerRoleId: 0, department: '' });
       fetchUsers();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при создании');
@@ -80,18 +115,17 @@ export default function AdminPanel() {
 
   const saveChanges = async () => {
     if (!selectedUser) return;
-    const token = localStorage.getItem('token');
-    const baseUrl = await getApiBase();
+    const { baseUrl, headers } = await withAuth();
     await axios.patch(
       `${baseUrl}/users/${selectedUser.id}`,
       {
         login: selectedUser.login,
         email: selectedUser.email,
         role: selectedUser.role,
+        trackerRoleId: selectedUser.trackerRoleId ? Number(selectedUser.trackerRoleId) : null,
+        department: selectedUser.department ? selectedUser.department.trim() : null,
       },
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
+      { headers },
     );
     setShowEditModal(false);
     fetchUsers();
@@ -99,57 +133,43 @@ export default function AdminPanel() {
 
   const confirmDelete = async () => {
     if (!selectedUser) return;
-    const token = localStorage.getItem('token');
-    const baseUrl = await getApiBase();
-    await axios.delete(`${baseUrl}/users/${selectedUser.id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { baseUrl, headers } = await withAuth();
+    await axios.delete(`${baseUrl}/users/${selectedUser.id}`, { headers });
     setShowDeleteModal(false);
     fetchUsers();
   };
 
-const handleImport = async () => {
-  if (!importFile) return;
+  const handleImport = async () => {
+    if (!importFile) return;
+    const formData = new FormData();
+    formData.append('file', importFile);
+    try {
+      const { baseUrl, headers } = await withAuth();
+      const res = await axios.post(`${baseUrl}/import/bitrix`, formData, {
+        headers: { ...headers, 'Content-Type': 'multipart/form-data' },
+      });
+      setPreviewUsers(res.data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Ошибка при загрузке CSV');
+    }
+  };
 
-  const formData = new FormData();
-  formData.append('file', importFile);
-
-  const token = localStorage.getItem('token');
-
-  try {
-    const baseUrl = await getApiBase();
-    const res = await axios.post(`${baseUrl}/import/bitrix`, formData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-
-    setPreviewUsers(res.data); // 👈 сохраняем результат
-  } catch (err: any) {
-    setError(err.response?.data?.message || 'Ошибка при загрузке CSV');
-  }
-};
-const handleConfirmImport = async () => {
-  const token = localStorage.getItem('token');
-
-  try {
-    const baseUrl = await getApiBase();
-    await axios.post(`${baseUrl}/import/bitrix/confirm`, previewUsers, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    fetchUsers(); // обновить таблицу
-    setShowImportModal(false);
-    setPreviewUsers([]);
-    setImportFile(null);
-  } catch (err: any) {
-    setError(err.response?.data?.message || 'Ошибка при подтверждении импорта');
-  }
-};
+  const handleConfirmImport = async () => {
+    try {
+      const { baseUrl, headers } = await withAuth();
+      await axios.post(`${baseUrl}/import/bitrix/confirm`, previewUsers, { headers });
+      fetchUsers();
+      setShowImportModal(false);
+      setPreviewUsers([]);
+      setImportFile(null);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Ошибка при подтверждении импорта');
+    }
+  };
 
   useEffect(() => {
     fetchUsers();
+    fetchTrackerRoles();
   }, []);
 
   return (
@@ -183,6 +203,8 @@ const handleConfirmImport = async () => {
             <th className="p-2 border">Логин</th>
             <th className="p-2 border">Email</th>
             <th className="p-2 border">Роль</th>
+            <th className="p-2 border">РольТ</th>{/* 👈 новая колонка */}
+            <th className="p-2 border">Отдел</th>{/* 👈 новая колонка */}
             <th className="p-2 border">Действия</th>
           </tr>
         </thead>
@@ -193,6 +215,40 @@ const handleConfirmImport = async () => {
               <td className="p-2 border text-center">{user.login}</td>
               <td className="p-2 border text-center">{user.email}</td>
               <td className="p-2 border text-center">{user.role}</td>
+
+              {/* РольТ (селект со списком ролей трекера) */}
+              <td className="p-2 border text-center">
+                <select
+                  className="border rounded px-2 py-1"
+                  value={user.trackerRoleId ?? 0}
+                  onChange={async (e) => {
+                    const trackerRoleId = Number(e.target.value) || null;
+                    const { baseUrl, headers } = await withAuth();
+                    await axios.patch(`${baseUrl}/users/${user.id}`, { trackerRoleId }, { headers });
+                    setUsers(prev => prev.map(u => u.id === user.id ? { ...u, trackerRoleId } : u));
+                  }}
+                >
+                  {rolesT.map(r => (
+                    <option key={r.id} value={r.id}>{r.title}</option>
+                  ))}
+                </select>
+              </td>
+
+              {/* Отдел */}
+              <td className="p-2 border text-center">
+                <input
+                  className="border rounded px-2 py-1 w-48"
+                  defaultValue={user.department ?? ''}
+                  placeholder="Напр.: Продажи"
+                  onBlur={async (e) => {
+                    const department = e.target.value ? e.target.value.trim() : null;
+                    const { baseUrl, headers } = await withAuth();
+                    await axios.patch(`${baseUrl}/users/${user.id}`, { department }, { headers });
+                    setUsers(prev => prev.map(u => u.id === user.id ? { ...u, department } : u));
+                  }}
+                />
+              </td>
+
               <td className="p-2 border">
                 <div className="flex justify-center gap-4">
                   <button
@@ -214,7 +270,8 @@ const handleConfirmImport = async () => {
         </tbody>
       </table>
 
-      {/* Модальные окна ниже: */}
+      {/* ===== МОДАЛКИ ===== */}
+
       {/* Редактирование */}
       <ReactModal
         isOpen={showEditModal}
@@ -228,39 +285,54 @@ const handleConfirmImport = async () => {
           placeholder="Логин"
           className="w-full border p-2 rounded mb-3"
           value={selectedUser?.login || ''}
-          onChange={(e) =>
-            setSelectedUser({ ...selectedUser!, login: e.target.value })
-          }
+          onChange={(e) => setSelectedUser({ ...selectedUser!, login: e.target.value })}
         />
         <input
           type="email"
           placeholder="Email"
           className="w-full border p-2 rounded mb-3"
           value={selectedUser?.email || ''}
-          onChange={(e) =>
-            setSelectedUser({ ...selectedUser!, email: e.target.value })
-          }
+          onChange={(e) => setSelectedUser({ ...selectedUser!, email: e.target.value })}
         />
         <select
-          className="w-full border p-2 rounded mb-4"
+          className="w-full border p-2 rounded mb-3"
           value={selectedUser?.role}
-          onChange={(e) =>
-            setSelectedUser({ ...selectedUser!, role: e.target.value })
-          }
+          onChange={(e) => setSelectedUser({ ...selectedUser!, role: e.target.value as BaseRole })}
         >
           <option value="admin">Admin</option>
           <option value="user">User</option>
         </select>
+
+        {/* РольТ и Отдел в модалке */}
+        <select
+          className="w-full border p-2 rounded mb-3"
+          value={selectedUser?.trackerRoleId ?? 0}
+          onChange={(e) =>
+            setSelectedUser({ ...selectedUser!, trackerRoleId: Number(e.target.value) || 0 })
+          }
+        >
+          {rolesT.map(r => (
+            <option key={r.id} value={r.id}>{r.title}</option>
+          ))}
+        </select>
+        <input
+          type="text"
+          placeholder="Отдел (например: Продажи)"
+          className="w-full border p-2 rounded mb-4"
+          value={selectedUser?.department ?? ''}
+          onChange={(e) => setSelectedUser({ ...selectedUser!, department: e.target.value })}
+        />
+
         <div className="flex justify-center">
           <button
             onClick={saveChanges}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2 flex items-center gap-2"
           >
             <FaSave /> Сохранить
           </button>
           <button
             onClick={() => setShowEditModal(false)}
-            className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+            className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 flex items-center gap-2"
           >
             <MdCancel /> Отмена
           </button>
@@ -324,13 +396,30 @@ const handleConfirmImport = async () => {
           onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
         />
         <select
-          className="w-full border p-2 rounded mb-4"
+          className="w-full border p-2 rounded mb-3"
           value={newUser.role}
-          onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+          onChange={(e) => setNewUser({ ...newUser, role: e.target.value as BaseRole })}
         >
           <option value="admin">Admin</option>
           <option value="user">User</option>
         </select>
+        <select
+          className="w-full border p-2 rounded mb-3"
+          value={newUser.trackerRoleId ?? 0}
+          onChange={(e) => setNewUser({ ...newUser, trackerRoleId: Number(e.target.value) || 0 })}
+        >
+          {rolesT.map(r => (
+            <option key={r.id} value={r.id}>{r.title}</option>
+          ))}
+        </select>
+        <input
+          type="text"
+          placeholder="Отдел (например: Продажи)"
+          className="w-full border p-2 rounded mb-4"
+          value={newUser.department ?? ''}
+          onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
+        />
+
         <div className="flex justify-center">
           <button
             onClick={handleCreateUser}
@@ -348,99 +437,93 @@ const handleConfirmImport = async () => {
       </ReactModal>
 
       {/* Импорт */}
-      
-<ReactModal
-  isOpen={showImportModal}
-  onRequestClose={() => {setShowImportModal(false); 
-  setPreviewUsers([]);
-  setImportFile(null);
+      <ReactModal
+        isOpen={showImportModal}
+        onRequestClose={() => {
+          setShowImportModal(false);
+          setPreviewUsers([]);
+          setImportFile(null);
+        }}
+        className="bg-white p-6 rounded shadow-md max-w-md mx-auto mt-20 outline-none"
+        overlayClassName="fixed inset-0 bg-opacity-40 backdrop-blur-sm flex items-center justify-center"
+      >
+        <h2 className="text-xl font-bold mb-4">Импорт пользователей</h2>
 
-}}
-  className="bg-white p-6 rounded shadow-md max-w-md mx-auto mt-20 outline-none"
-  overlayClassName="fixed inset-0 bg-opacity-40 backdrop-blur-sm flex items-center justify-center">
-  <h2 className="text-xl font-bold mb-4">Импорт пользователей</h2>
+        <div className="mb-4">
+          <label className="block mb-2 font-semibold">Источник данных</label>
+          <select
+            className="w-full border p-2 rounded"
+            value={selectedSource}
+            onChange={(e) => setSelectedSource(e.target.value as any)}
+          >
+            <option value="bitrix24"> Bitrix24</option>
+            <option value="trackstudio">TrackStudio</option>
+            <option value="jira">Jira</option>
+          </select>
+        </div>
 
-  {/* Выбор источника */}
-  <div className="mb-4">
-    <label className="block mb-2 font-semibold">Источник данных</label>
-    <select
-      className="w-full border p-2 rounded"
-      value={selectedSource}
-      onChange={(e) => setSelectedSource(e.target.value as any)}
-    >
-      <option value="bitrix24"> Bitrix24</option>
-      <option value="trackstudio">TrackStudio</option>
-      <option value="jira">Jira</option>
-    </select>
-  </div>
+        {selectedSource === 'bitrix24' && (
+          <div className="flex items-center gap-2 text-blue-600 mb-2">
+            <SiBraintree size={20} /> <span>Импорт из Bitrix24 (CSV)</span>
+          </div>
+        )}
+        {selectedSource === 'trackstudio' && (
+          <div className="flex items-center gap-2 text-yellow-700 mb-2">
+            <SiApache size={20} /> <span>Импорт из TrackStudio пока не реализован</span>
+          </div>
+        )}
+        {selectedSource === 'jira' && (
+          <div className="flex items-center gap-2 text-indigo-600 mb-2">
+            <SiJira size={20} /> <span>Импорт из Jira пока не реализован</span>
+          </div>
+        )}
 
-  {/* Описание источника и иконка */}
-  {selectedSource === 'bitrix24' && (
-    <div className="flex items-center gap-2 text-blue-600 mb-2">
-      <SiBraintree size={20} /> <span>Импорт из Bitrix24 (CSV)</span>
+        {selectedSource === 'bitrix24' && (
+          <input
+            type="file"
+            accept=".xls"
+            onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+            className="w-full border p-2 rounded mb-4"
+          />
+        )}
+
+        {previewUsers.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-2">Предпросмотр пользователей:</h3>
+            <table className="w-full border text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border p-1">ФИО</th>
+                  <th className="border p-1">Email</th>
+                  <th className="border p-1">Источник</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewUsers.map((u, idx) => (
+                  <tr key={idx}>
+                    <td className="border p-1">{u.fullName}</td>
+                    <td className="border p-1">{u.email}</td>
+                    <td className="border p-1">{u.source}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <button
+          onClick={previewUsers.length > 0 ? handleConfirmImport : handleImport}
+          disabled={selectedSource !== 'bitrix24' || (!importFile && previewUsers.length === 0)}
+          className={`mt-4 w-full px-4 py-2 rounded flex items-center justify-center gap-2 ${
+            selectedSource !== 'bitrix24'
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          <FaSave />
+          {previewUsers.length > 0 ? 'Импортировать в систему' : 'Импортировать'}
+        </button>
+      </ReactModal>
     </div>
-  )}
-  {selectedSource === 'trackstudio' && (
-    <div className="flex items-center gap-2 text-yellow-700 mb-2">
-      <SiApache size={20} /> <span>Импорт из TrackStudio пока не реализован</span>
-    </div>
-  )}
-  {selectedSource === 'jira' && (
-    <div className="flex items-center gap-2 text-indigo-600 mb-2">
-      <SiJira size={20} /> <span>Импорт из Jira пока не реализован</span>
-    </div>
-  )}
-
-  {/* Форма загрузки файла только для Bitrix24 */}
-  {selectedSource === 'bitrix24' && (
-    <input
-      type="file"
-      accept=".xls"
-      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-      className="w-full border p-2 rounded mb-4"
-    />
-  )}
- {/* Предпросмотр (если есть) */}
-{previewUsers.length > 0 && (
-  <div className="mt-6">
-    <h3 className="text-lg font-semibold mb-2">Предпросмотр пользователей:</h3>
-    <table className="w-full border text-sm">
-      <thead className="bg-gray-100">
-        <tr>
-          <th className="border p-1">ФИО</th>
-          <th className="border p-1">Email</th>
-          <th className="border p-1">Источник</th>
-        </tr>
-      </thead>
-      <tbody>
-        {previewUsers.map((u, idx) => (
-          <tr key={idx}>
-            <td className="border p-1">{u.fullName}</td>
-            <td className="border p-1">{u.email}</td>
-            <td className="border p-1">{u.source}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-)}
-
-{/* ✅ Кнопка — всегда внизу модалки */}
-<button
-  onClick={previewUsers.length > 0 ? handleConfirmImport : handleImport}
-  disabled={selectedSource !== 'bitrix24' || (!importFile && previewUsers.length === 0)}
-  className={`mt-4 w-full px-4 py-2 rounded flex items-center justify-center gap-2 ${
-    selectedSource !== 'bitrix24'
-      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-      : 'bg-blue-600 text-white hover:bg-blue-700'
-  }`}
->
-  <FaSave />
-  {previewUsers.length > 0 ? 'Импортировать в систему' : 'Импортировать'}
-</button>
-
-</ReactModal>
-    </div>
-
   );
 }
