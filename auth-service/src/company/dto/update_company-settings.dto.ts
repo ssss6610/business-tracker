@@ -1,12 +1,16 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateCompanySettingsDto {
   @IsString()
-  @MaxLength(255)
+  @MinLength(2)
   name: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(512)
   logoUrl?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  departments?: string[];
 }

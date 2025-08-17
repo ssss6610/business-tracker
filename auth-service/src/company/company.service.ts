@@ -14,7 +14,12 @@ export class CompanyService {
   async get(): Promise<CompanySettings> {
     let row = await this.repo.findOne({ where: { id: 1 } });
     if (!row) {
-      row = this.repo.create({ id: 1, name: '', logoUrl: null });
+      row = this.repo.create({
+        id: 1,
+        name: '',
+        logoUrl: null,
+        departments: [],
+      });
       await this.repo.save(row);
     }
     return row;
@@ -24,6 +29,7 @@ export class CompanyService {
     const row = await this.get();
     row.name = dto.name.trim();
     row.logoUrl = dto.logoUrl ?? null;
+    row.departments = dto.departments ?? row.departments ?? [];
     return this.repo.save(row);
   }
 }

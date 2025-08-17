@@ -4,14 +4,20 @@ import { makeAbsoluteUrl } from '../../utils/assetUrl';
 import LogoUploader from '../../components/LogoUploader';
 
 type LogoFile = { file: File | null; preview: string | null };
-type CompanySettingsDto = { name: string; logoUrl?: string | null };
+type CompanySettingsDto = {
+  name: string;
+  logoUrl?: string | null;
+  departments?: string[];
+};
 
 type PersistenceMode = 'server' | 'local';
 const LS_KEY = 'companySettings';
 
 export default function CompanySettings() {
-  const [form, setForm] = useState<CompanySettingsDto>({ name: '', logoUrl: null });
+  const [form, setForm] = useState<CompanySettingsDto>({ name: '', logoUrl: null, departments: [] });
   const [logo, setLogo] = useState<LogoFile | null>(null);
+  const [deptInput, setDeptInput] = useState(''); // поле ввода отдела
+
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +25,7 @@ export default function CompanySettings() {
 
   const initialRef = useRef<CompanySettingsDto | null>(null);
 
-  // Загрузка начальных настроек
+  // ===== загрузка =====
   useEffect(() => {
     (async () => {
       setError(null);
@@ -34,20 +40,27 @@ export default function CompanySettings() {
         const data: CompanySettingsDto = await res.json();
         const name = data.name ?? '';
         const logoUrlAbs = await makeAbsoluteUrl(data.logoUrl ?? null);
+        const departments = Array.isArray(data.departments) ? data.departments : [];
 
-        setForm({ name, logoUrl: logoUrlAbs });
-        initialRef.current = { name, logoUrl: logoUrlAbs };
+        const normalized = { name, logoUrl: logoUrlAbs, departments };
+        setForm(normalized);
+        initialRef.current = normalized;
         setMode('server');
       } catch {
-        // Фоллбэк в локальный режим
+        // локальный режим
         setMode('local');
         try {
           const raw = localStorage.getItem(LS_KEY);
-          const parsed = raw ? (JSON.parse(raw) as CompanySettingsDto) : { name: '', logoUrl: null };
-          setForm({ name: parsed.name ?? '', logoUrl: parsed.logoUrl ?? null });
-          initialRef.current = { name: parsed.name ?? '', logoUrl: parsed.logoUrl ?? null };
+          const parsed = raw ? (JSON.parse(raw) as CompanySettingsDto) : { name: '', logoUrl: null, departments: [] };
+          const normalized = {
+            name: parsed.name ?? '',
+            logoUrl: parsed.logoUrl ?? null,
+            departments: Array.isArray(parsed.departments) ? parsed.departments : [],
+          };
+          setForm(normalized);
+          initialRef.current = normalized;
         } catch {
-          initialRef.current = { name: '', logoUrl: null };
+          initialRef.current = { name: '', logoUrl: null, departments: [] };
         }
       }
     })();
@@ -57,15 +70,53 @@ export default function CompanySettings() {
   const isDirty =
     (initialRef.current?.name ?? '') !== form.name ||
     (initialRef.current?.logoUrl ?? null) !== form.logoUrl ||
+    JSON.stringify(initialRef.current?.departments ?? []) !== JSON.stringify(form.departments ?? []) ||
     !!logo?.file;
 
-  // Сохранение
+  // ===== отделы — helpers =====
+  const addDepartment = () => {
+    const v = deptInput.trim();
+    if (!v) return;
+    if (v.length > 100) {
+      setError('Название отдела слишком длинное (до 100 символов).');
+      return;
+    }
+    // уникальность без учёта регистра
+    const exists = (form.departments ?? []).some((d) => d.toLowerCase() === v.toLowerCase());
+    if (exists) {
+      setError('Такой отдел уже есть.');
+      return;
+    }
+    setForm((f) => ({ ...f, departments: [...(f.departments ?? []), v] }));
+    setDeptInput('');
+    setSaved(false);
+  };
+
+  const removeDepartment = (idx: number) => {
+    setForm((f) => ({
+      ...f,
+      departments: (f.departments ?? []).filter((_, i) => i !== idx),
+    }));
+    setSaved(false);
+  };
+
+  const renameDepartment = (idx: number, value: string) => {
+    const v = value.trim();
+    setForm((f) => {
+      const arr = [...(f.departments ?? [])];
+      arr[idx] = v;
+      return { ...f, departments: arr };
+    });
+    setSaved(false);
+  };
+
+  // ===== сохранение =====
   const onSave = async () => {
     setError(null);
     setSaved(false);
     setLoading(true);
     try {
-      let logoUrl: string | null = form.logoUrl ?? null;
+      let logoUrl = form.logoUrl ?? null;
 
       if (mode === 'server') {
         const token = localStorage.getItem('token');
@@ -81,37 +132,58 @@ export default function CompanySettings() {
           });
           if (!up.ok) throw new Error('Ошибка загрузки логотипа');
           const { url } = await up.json();
-          logoUrl = url; // сервер вернул относительный путь /uploads/...
+          logoUrl = url; // относительный путь от бэка
         }
+
+        // фильтр отделов: trim, убираем пустые/дубликаты
+        const cleaned = Array.from(
+          new Set((form.departments ?? []).map((d) => d.trim()).filter(Boolean)),
+        );
 
         const res = await fetch(`${baseUrl}/admin/company`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ name: form.name.trim(), logoUrl }),
+          body: JSON.stringify({
+            name: form.name.trim(),
+            logoUrl,
+            departments: cleaned,
+          } as CompanySettingsDto),
         });
         if (!res.ok) throw new Error('Не удалось сохранить настройки');
       } else {
-        // локально храним dataURL превью, если выбрали новый файл
+        // локальный режим
         if (logo?.file && logo.preview) {
-          logoUrl = logo.preview;
+          logoUrl = logo.preview; // dataURL
         }
-        const toSave: CompanySettingsDto = { name: form.name.trim(), logoUrl: logoUrl ?? null };
+        const cleaned = Array.from(
+          new Set((form.departments ?? []).map((d) => d.trim()).filter(Boolean)),
+        );
+        const toSave: CompanySettingsDto = {
+          name: form.name.trim(),
+          logoUrl: logoUrl ?? null,
+          departments: cleaned,
+        };
         localStorage.setItem(LS_KEY, JSON.stringify(toSave));
       }
 
-      // Приводим ссылку к абсолютной (или оставляем dataURL/abs как есть)
+      // нормализуем URL лого до абсолютного
       const absUrl = await makeAbsoluteUrl(logoUrl ?? null);
 
       setSaved(true);
       setLogo((prev) => (prev ? { ...prev, file: null } : prev));
-      initialRef.current = { name: form.name.trim(), logoUrl: absUrl };
-      setForm((f) => ({ ...f, logoUrl: absUrl }));
+      const normalized: CompanySettingsDto = {
+        name: form.name.trim(),
+        logoUrl: absUrl,
+        departments: Array.from(new Set((form.departments ?? []).map((d) => d.trim()).filter(Boolean))),
+      };
+      initialRef.current = normalized;
+      setForm(normalized);
 
-      // оповещаем лэйауты
+      // оповестим лэйауты
       window.dispatchEvent(
         new CustomEvent<CompanySettingsDto>('company:updated', {
-          detail: { name: form.name.trim(), logoUrl: absUrl },
-        })
+          detail: normalized,
+        }),
       );
     } catch (e: any) {
       setError(e?.message ?? 'Ошибка сохранения');
@@ -126,24 +198,25 @@ export default function CompanySettings() {
     setLogo(null);
     setSaved(false);
     setError(null);
+    setDeptInput('');
   };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Настройки компании</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Персонализация</h1>
 
       {mode === 'local' && (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Сервер компании недоступен — настройки сохраняются локально в этом браузере.
-          Поднимешь API — страница начнёт работать через сервер автоматически.
+          Сервер недоступен — настройки сохраняются локально в этом браузере.
         </div>
       )}
 
       <div className="mt-6 rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-6 py-4">
-          <p className="text-sm text-gray-500">Основные параметры, которые видны сотрудникам и клиентам.</p>
+          <p className="text-sm text-gray-500">Название, логотип и структура отделов.</p>
         </div>
 
+        {/* Основные поля */}
         <div className="space-y-6 px-6 py-6">
           {/* Название компании */}
           <div>
@@ -152,7 +225,7 @@ export default function CompanySettings() {
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               type="text"
-              placeholder="Например: Рога и копыта"
+              placeholder="Например: ПрограмБанк"
               className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
               aria-invalid={!isNameValid}
             />
@@ -174,8 +247,63 @@ export default function CompanySettings() {
               {mode === 'local' && ' В локальном режиме логотип хранится как превью (dataURL).'}
             </p>
           </div>
+
+          {/* Отделы */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Отделы</label>
+            <div className="mt-2 flex gap-2">
+              <input
+                type="text"
+                value={deptInput}
+                onChange={(e) => setDeptInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addDepartment();
+                  }
+                }}
+                placeholder="Например: Продажи"
+                className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+              />
+              <button
+                type="button"
+                onClick={addDepartment}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
+              >
+                Добавить
+              </button>
+            </div>
+
+            {form.departments && form.departments.length > 0 ? (
+              <ul className="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+                {form.departments.map((d, idx) => (
+                  <li key={`${d}-${idx}`} className="flex items-center gap-2 px-3 py-2">
+                    <input
+                      className="flex-1 rounded border border-gray-300 px-2 py-1 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200"
+                      value={d}
+                      onChange={(e) => renameDepartment(idx, e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeDepartment(idx)}
+                      className="rounded border border-gray-300 px-2 py-1 text-sm hover:bg-gray-50"
+                      aria-label={`Удалить отдел ${d}`}
+                    >
+                      Удалить
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-xs text-gray-500">Пока нет отделов. Добавьте первый в поле выше.</p>
+            )}
+            <p className="mt-2 text-xs text-gray-500">
+              Эти отделы будут доступны в админ-таблице пользователей и других сервисах.
+            </p>
+          </div>
         </div>
 
+        {/* Footer */}
         <div className="flex items-center justify-between gap-3 border-t border-gray-100 px-6 py-4">
           <div className="text-sm">
             {saved && <span className="text-emerald-600">Сохранено ✔</span>}
