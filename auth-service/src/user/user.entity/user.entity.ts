@@ -1,4 +1,11 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+import { TrackerRole } from '../../tracker/tracker-role.entity'; // ⚠️ проверь путь!
 
 export enum Role {
   Admin = 'admin',
@@ -30,7 +37,12 @@ export class User {
   @Column({ type: 'enum', enum: UserType, default: UserType.Employee })
   userType: UserType;
 
+  // 👇 связь на роль трекера
+  @Column({ nullable: true })
+  trackerRoleId?: number | null;
+
   @ManyToOne(() => TrackerRole, { nullable: true })
+  @JoinColumn({ name: 'trackerRoleId' })
   trackerRole?: TrackerRole | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
