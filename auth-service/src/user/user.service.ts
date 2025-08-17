@@ -13,6 +13,11 @@ export class UserService {
     private readonly userRepository: Repository<User>,
   ) {}
 
+  // совместимость со старыми вызовами
+  async save(user: User): Promise<User> {
+  return this.userRepository.save(user);
+ }
+
   // --- базовые методы ---
 
   async findAdmin(): Promise<User | null> {

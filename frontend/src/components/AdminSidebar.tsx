@@ -50,7 +50,7 @@ export default function Sidebar() {
       <nav className="flex-1 space-y-2">
         {item('/admin', <FaUsers size={20}/>, 'Пользователи', { end: true })}
         {item('/admin/monitoring', <MdOutlineMonitorHeart size={20}/>, 'Мониторинг')}
-        {item('/admin/roles', <FaUserCog size={20}/>, 'Роли')}
+        {item('/admin/tracker', <FaUserCog size={20}/>, 'Трекер')}
         {item('/admin/thresholds', <CirclePlus size={20}/>, 'Пороги')}
         {item('/admin/settings', <MdSettings size={20}/>, 'Персонализация')}
       </nav>

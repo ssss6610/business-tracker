@@ -6,7 +6,6 @@ import ChangePassword from './pages/ChangePassword';
 
 import AdminPanel from './pages/admin-panel/AdminPanel';
 import Monitoring from './pages/admin-panel/Monitoring';
-import Roles from './pages/admin-panel/Roles';
 import Thresholds from './pages/admin-panel/Thresholds';
 import TrackerSettings from './pages/admin-panel/TrackerSettings';
 import CompanySettings from './pages/admin-panel/CompanySettings';
@@ -51,7 +50,6 @@ function App() {
         <Route path="admin" element={<PrivateRoute><AdminLayout /></PrivateRoute>}>
           <Route index element={<AdminPanel />} />
           <Route path="monitoring" element={<Monitoring />} />
-          <Route path="roles" element={<Roles />} />
           <Route path="thresholds" element={<Thresholds />} />
           <Route path="tracker" element={<TrackerSettings />} />
           <Route path="settings" element={<CompanySettings />} />
