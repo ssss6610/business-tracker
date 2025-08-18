@@ -1,3 +1,4 @@
+// src/App.tsx
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
@@ -22,9 +23,10 @@ import AnalyticsPage from "./pages/workspace/AnalyticsPage";
 import PrivateRoute from "./components/PrivateRoute";
 import AppLayout from "./layouts/AppLayout";
 import AdminLayout from "./layouts/AdminLayout";
+import WorkspaceLayout from "./layouts/WorkspaceLayout"; // 👈 добавили
 
 import { getApiBase } from "./utils/getApiBase";
-import { DEFAULT_BRAND } from "./utils/defaultBranding";
+import { DEFAULT_BRAND } from "./utils/defaultBranding"; // 👈 путь на config
 
 type Branding = { name: string; logoUrl: string | null };
 
@@ -107,8 +109,10 @@ export default function App() {
   useEffect(() => {
     document.title = brand.name || DEFAULT_BRAND.name;
 
-    const faviconCandidate = brand.logoUrl || DEFAULT_BRAND.faviconUrl;
-    const abs = toAbsolute(faviconCandidate, apiBase) || DEFAULT_BRAND.faviconUrl;
+    // если в DEFAULT_BRAND нет faviconUrl, просто положи /favicon.png в public
+    const defaultFav = (DEFAULT_BRAND as any).faviconUrl || "/favicon.png";
+    const faviconCandidate = brand.logoUrl || defaultFav;
+    const abs = toAbsolute(faviconCandidate, apiBase) || defaultFav;
     setFavicons(abs);
   }, [brand.name, brand.logoUrl, apiBase]);
 
@@ -119,6 +123,7 @@ export default function App() {
         <Route path="/setup" element={<Setup />} />
         <Route path="/change-password" element={<ChangePassword />} />
 
+        {/* WORKSPACE: AppLayout (топ-хедер) -> WorkspaceLayout (левый сайдбар) */}
         <Route
           path="/workspace"
           element={
@@ -127,15 +132,18 @@ export default function App() {
             </PrivateRoute>
           }
         >
-          <Route index element={<WorkspaceHome />} />
-          <Route path="chat" element={<ChatPage />} />
-          <Route path="calendar" element={<CalendarPage />} />
-          <Route path="tracker" element={<TrackerPage />} />
-          <Route path="employees" element={<EmployeesPage />} />
-          <Route path="mail" element={<MailPage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route element={<WorkspaceLayout />}>
+            <Route index element={<WorkspaceHome />} />
+            <Route path="chat" element={<ChatPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="tracker" element={<TrackerPage />} />
+            <Route path="employees" element={<EmployeesPage />} />
+            <Route path="mail" element={<MailPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+          </Route>
         </Route>
 
+        {/* ADMIN: у тебя уже всё ок */}
         <Route
           path="/admin"
           element={
