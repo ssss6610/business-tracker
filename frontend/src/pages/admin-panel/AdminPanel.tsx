@@ -1,3 +1,4 @@
+// src/pages/admin-panel/AdminPanel.tsx
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import ReactModal from 'react-modal';
@@ -16,26 +17,22 @@ interface User {
   login: string;
   email: string;
   role: BaseRole;
-  // новые поля
   userType: UserType;
   trackerRoleId?: number | null;
-  trackerRoleTitle?: string | null; // опционально, если бэк отдаёт
   department?: string | null;
 }
 
 interface TrackerRole { id: number; title: string; }
-
-interface ImportedUserDto {
-  fullName: string;
-  email: string;
-  source: string;
-}
+interface ImportedUserDto { fullName: string; email: string; source: string; }
 
 export default function AdminPanel() {
   const [users, setUsers] = useState<User[]>([]);
-  const [rolesT, setRolesT] = useState<TrackerRole[]>([]);
+  const [rolesT, setRolesT] = useState<TrackerRole[]>([{ id: 0, title: '— нет роли —' }]);
+  const [departments, setDepartments] = useState<string[]>([]);
+
   const [error, setError] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -50,9 +47,8 @@ export default function AdminPanel() {
     email: '',
     role: 'user',
     password: '',
-    // новые поля
     userType: 'employee',
-    trackerRoleId: 0,      // 0 = «нет роли»
+    trackerRoleId: 0,
     department: '',
   });
 
@@ -82,6 +78,33 @@ export default function AdminPanel() {
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const { baseUrl, headers } = await withAuth();
+      const res = await axios.get(`${baseUrl}/admin/company`, { headers });
+      const list: string[] = Array.isArray(res.data?.departments) ? res.data.departments : [];
+      setDepartments(list);
+    } catch {
+      try {
+        const raw = localStorage.getItem('companySettings');
+        const parsed = raw ? JSON.parse(raw) : {};
+        setDepartments(Array.isArray(parsed?.departments) ? parsed.departments : []);
+      } catch {
+        setDepartments([]);
+      }
+    }
+  };
+
+  // реакция на обновление персонализации (в т.ч. отделов)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ departments?: string[] }>;
+      if (Array.isArray(ce.detail?.departments)) setDepartments(ce.detail.departments);
+    };
+    window.addEventListener('company:updated', handler as any);
+    return () => window.removeEventListener('company:updated', handler as any);
+  }, []);
+
   const handleEdit = (user: User) => {
     setSelectedUser({
       ...user,
@@ -105,7 +128,6 @@ export default function AdminPanel() {
         email: newUser.email,
         role: newUser.role,
         password: newUser.password,
-        // новые поля
         userType: newUser.userType ?? 'employee',
         trackerRoleId: newUser.trackerRoleId ? Number(newUser.trackerRoleId) : null,
         department: newUser.department ? newUser.department.trim() : null,
@@ -132,7 +154,6 @@ export default function AdminPanel() {
           login: selectedUser.login,
           email: selectedUser.email,
           role: selectedUser.role,
-          // новые поля
           userType: selectedUser.userType ?? 'employee',
           trackerRoleId: selectedUser.trackerRoleId ? Number(selectedUser.trackerRoleId) : null,
           department: selectedUser.department ? selectedUser.department.trim() : null,
@@ -158,22 +179,33 @@ export default function AdminPanel() {
     }
   };
 
+  // ---------- ИМПОРТ B24: FIXED ----------
   const handleImport = async () => {
     if (!importFile) return;
+
+    setError('');
+    setPreviewUsers([]);
+
     const formData = new FormData();
-    formData.append('file', importFile);
+    formData.append('file', importFile); // важно: имя поля 'file'
+
     try {
       const { baseUrl, headers } = await withAuth();
-      const res = await axios.post(`${baseUrl}/import/bitrix`, formData, {
-        headers: { ...headers, 'Content-Type': 'multipart/form-data' },
-      });
-      setPreviewUsers(res.data);
+      // Не задаём Content-Type — axios сам поставит boundary
+      const res = await axios.post(`${baseUrl}/import/bitrix`, formData, { headers });
+
+      const rows = Array.isArray(res.data) ? res.data : (res.data?.preview ?? []);
+      if (!rows.length) {
+        setError('Файл загружен, но данные не распознаны. Убедитесь, что это XLS/XLSX из Bitrix24.');
+      }
+      setPreviewUsers(rows);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка при загрузке файла');
+      setError(err.response?.data?.message || 'Ошибка при загрузке файла Bitrix24');
     }
   };
 
   const handleConfirmImport = async () => {
+    if (previewUsers.length === 0) return;
     try {
       const { baseUrl, headers } = await withAuth();
       await axios.post(`${baseUrl}/import/bitrix/confirm`, previewUsers, { headers });
@@ -185,11 +217,16 @@ export default function AdminPanel() {
       setError(err.response?.data?.message || 'Ошибка при подтверждении импорта');
     }
   };
+  // ---------------------------------------
 
   useEffect(() => {
     fetchUsers();
     fetchTrackerRoles();
+    fetchDepartments();
   }, []);
+
+  const trackerRoleTitle = (id?: number | null) =>
+    rolesT.find(r => r.id === (id ?? 0))?.title ?? '— нет роли —';
 
   return (
     <div className="p-6">
@@ -230,85 +267,25 @@ export default function AdminPanel() {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className="border-t">
-                <td className="p-2 border">{user.id}</td>
-                <td className="p-2 border">{user.login}</td>
-                <td className="p-2 border">{user.email}</td>
-                <td className="p-2 border">{user.role}</td>
-
-                {/* РольТ */}
-                <td className="p-2 border">
-                  <select
-                    className="border rounded px-2 py-1"
-                    value={user.trackerRoleId ?? 0}
-                    onChange={async (e) => {
-                      const trackerRoleId = Number(e.target.value) || null;
-                      try {
-                        const { baseUrl, headers } = await withAuth();
-                        await axios.patch(`${baseUrl}/users/${user.id}`, { trackerRoleId }, { headers });
-                        setUsers(prev => prev.map(u => u.id === user.id ? { ...u, trackerRoleId } : u));
-                      } catch (err: any) {
-                        setError(err.response?.data?.message || 'Не удалось обновить роль трекера');
-                      }
-                    }}
-                  >
-                    {rolesT.map(r => (
-                      <option key={r.id} value={r.id}>{r.title}</option>
-                    ))}
-                  </select>
-                </td>
-
-                {/* Отдел */}
-                <td className="p-2 border">
-                  <input
-                    className="border rounded px-2 py-1 w-48"
-                    defaultValue={user.department ?? ''}
-                    placeholder="Напр.: Продажи"
-                    onBlur={async (e) => {
-                      const department = e.target.value ? e.target.value.trim() : null;
-                      try {
-                        const { baseUrl, headers } = await withAuth();
-                        await axios.patch(`${baseUrl}/users/${user.id}`, { department }, { headers });
-                        setUsers(prev => prev.map(u => u.id === user.id ? { ...u, department } : u));
-                      } catch (err: any) {
-                        setError(err.response?.data?.message || 'Не удалось обновить отдел');
-                      }
-                    }}
-                  />
-                </td>
-
-                {/* Тип (userType) */}
-                <td className="p-2 border">
-                  <select
-                    className="border rounded px-2 py-1"
-                    value={user.userType ?? 'employee'}
-                    onChange={async (e) => {
-                      const userType = e.target.value as UserType;
-                      try {
-                        const { baseUrl, headers } = await withAuth();
-                        await axios.patch(`${baseUrl}/users/${user.id}`, { userType }, { headers });
-                        setUsers(prev => prev.map(u => u.id === user.id ? { ...u, userType } : u));
-                      } catch (err: any) {
-                        setError(err.response?.data?.message || 'Не удалось обновить тип');
-                      }
-                    }}
-                  >
-                    <option value="employee">Сотрудник</option>
-                    <option value="client">Клиент</option>
-                  </select>
-                </td>
-
+            {users.map((u) => (
+              <tr key={u.id} className="border-t">
+                <td className="p-2 border">{u.id}</td>
+                <td className="p-2 border">{u.login}</td>
+                <td className="p-2 border">{u.email}</td>
+                <td className="p-2 border">{u.role}</td>
+                <td className="p-2 border">{trackerRoleTitle(u.trackerRoleId)}</td>
+                <td className="p-2 border">{u.department ?? '—'}</td>
+                <td className="p-2 border">{u.userType === 'employee' ? 'Сотрудник' : 'Клиент'}</td>
                 <td className="p-2 border">
                   <div className="flex justify-center gap-4">
                     <button
-                      onClick={() => handleEdit(user)}
+                      onClick={() => handleEdit(u)}
                       className="text-blue-600 hover:underline flex items-center gap-2"
                     >
                       <MdEdit /> Редактировать
                     </button>
                     <button
-                      onClick={() => handleDelete(user)}
+                      onClick={() => handleDelete(u)}
                       className="text-red-600 hover:underline flex items-center gap-2"
                     >
                       <FaTrash /> Удалить
@@ -354,7 +331,7 @@ export default function AdminPanel() {
           <option value="user">User</option>
         </select>
 
-        {/* РольТ и Отдел + Тип */}
+        <label className="text-sm text-gray-600">Роль в трекере</label>
         <select
           className="w-full border p-2 rounded mb-3"
           value={selectedUser?.trackerRoleId ?? 0}
@@ -367,14 +344,19 @@ export default function AdminPanel() {
           ))}
         </select>
 
-        <input
-          type="text"
-          placeholder="Отдел (например: Продажи)"
+        <label className="text-sm text-gray-600">Отдел</label>
+        <select
           className="w-full border p-2 rounded mb-3"
           value={selectedUser?.department ?? ''}
-          onChange={(e) => setSelectedUser({ ...selectedUser!, department: e.target.value })}
-        />
+          onChange={(e) => setSelectedUser({ ...selectedUser!, department: e.target.value || null })}
+        >
+          <option value="">— не указан —</option>
+          {departments.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
 
+        <label className="text-sm text-gray-600">Тип</label>
         <select
           className="w-full border p-2 rounded mb-4"
           value={selectedUser?.userType ?? 'employee'}
@@ -465,7 +447,7 @@ export default function AdminPanel() {
           <option value="user">User</option>
         </select>
 
-        {/* РольТ, Отдел, Тип */}
+        <label className="text-sm text-gray-600">Роль в трекере</label>
         <select
           className="w-full border p-2 rounded mb-3"
           value={newUser.trackerRoleId ?? 0}
@@ -476,14 +458,19 @@ export default function AdminPanel() {
           ))}
         </select>
 
-        <input
-          type="text"
-          placeholder="Отдел (например: Продажи)"
+        <label className="text-sm text-gray-600">Отдел</label>
+        <select
           className="w-full border p-2 rounded mb-3"
           value={newUser.department ?? ''}
           onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
-        />
+        >
+          <option value="">— не указан —</option>
+          {departments.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
 
+        <label className="text-sm text-gray-600">Тип</label>
         <select
           className="w-full border p-2 rounded mb-4"
           value={newUser.userType}
@@ -516,6 +503,7 @@ export default function AdminPanel() {
           setShowImportModal(false);
           setPreviewUsers([]);
           setImportFile(null);
+          setError('');
         }}
         className="bg-white p-6 rounded shadow-md max-w-md mx-auto mt-20 outline-none"
         overlayClassName="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center"
@@ -537,7 +525,7 @@ export default function AdminPanel() {
 
         {selectedSource === 'bitrix24' && (
           <div className="flex items-center gap-2 text-blue-600 mb-2">
-            <SiBraintree size={20} /> <span>Импорт из Bitrix24 (CSV/XLS)</span>
+            <SiBraintree size={20} /> <span>Импорт из Bitrix24 (XLS/XLSX)</span>
           </div>
         )}
         {selectedSource === 'trackstudio' && (
@@ -551,10 +539,16 @@ export default function AdminPanel() {
           </div>
         )}
 
+        {error && (
+          <div className="mb-3 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700 text-sm">
+            {error}
+          </div>
+        )}
+
         {selectedSource === 'bitrix24' && (
           <input
             type="file"
-            accept=".csv,.xls,.xlsx"
+            accept=".xls,.xlsx"
             onChange={(e) => setImportFile(e.target.files?.[0] || null)}
             className="w-full border p-2 rounded mb-4"
           />
