@@ -57,7 +57,7 @@ export class PublicCompanyController {
   async getPublic() {
     const s = await this.service.get();
     return {
-      name: s.name || 'Добро пожаловать',
+      name: s.name || 'OpenWorkspace',
       logoUrl: s.logoUrl || null,
       departments: s.departments ?? [],
     };

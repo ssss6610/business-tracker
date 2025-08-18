@@ -3,38 +3,37 @@ import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 import { getApiBase } from '../utils/getApiBase';
+import { DEFAULT_BRAND } from '../utils/defaultBranding';
 
 type Branding = { name: string; logoUrl: string | null };
-
-const DEFAULT_BRAND: Branding = {
-  name: 'OpenWorkspace',
-  logoUrl: null,
-};
 
 export default function Login() {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [brand, setBrand] = useState<Branding>(DEFAULT_BRAND);
+  const [brand, setBrand] = useState<Branding>({
+    name: DEFAULT_BRAND.name,
+    logoUrl: DEFAULT_BRAND.logoUrl,
+  });
   const [cacheBust, setCacheBust] = useState<number>(Date.now());
-  const [baseUrl, setBaseUrl] = useState<string>('');
   const navigate = useNavigate();
 
   useEffect(() => {
     (async () => {
       const base = await getApiBase();
-      setBaseUrl(base);
       try {
         const res = await fetch(`${base}/public/company`);
         if (res.ok) {
           const data = await res.json();
           setBrand({
             name: data?.name || DEFAULT_BRAND.name,
-            logoUrl: data?.logoUrl ?? null,
+            logoUrl: data?.logoUrl ?? DEFAULT_BRAND.logoUrl,
           });
+        } else {
+          setBrand({ name: DEFAULT_BRAND.name, logoUrl: DEFAULT_BRAND.logoUrl });
         }
       } catch {
-        // оставим дефолт
+        setBrand({ name: DEFAULT_BRAND.name, logoUrl: DEFAULT_BRAND.logoUrl });
       }
     })();
   }, []);
@@ -44,7 +43,7 @@ export default function Login() {
       const ce = e as CustomEvent<{ name?: string; logoUrl?: string | null }>;
       setBrand({
         name: ce.detail?.name || DEFAULT_BRAND.name,
-        logoUrl: ce.detail?.logoUrl ?? null,
+        logoUrl: ce.detail?.logoUrl ?? DEFAULT_BRAND.logoUrl,
       });
       setCacheBust(Date.now());
     };
@@ -52,23 +51,31 @@ export default function Login() {
     return () => window.removeEventListener('company:updated', onUpdated as any);
   }, []);
 
+  useEffect(() => {
+    document.title = brand.name || DEFAULT_BRAND.name;
+  }, [brand.name]);
+
+  // логотип: если пришёл абсолютный URL — используем его, иначе public-путь
   const logoSrc = useMemo(() => {
-    if (!brand.logoUrl) return null;
-    if (/^https?:\/\//i.test(brand.logoUrl)) return `${brand.logoUrl}?v=${cacheBust}`;
-    const rel = brand.logoUrl.startsWith('/') ? brand.logoUrl : `/${brand.logoUrl}`;
-    return baseUrl ? `${baseUrl}${rel}?v=${cacheBust}` : null;
-  }, [brand.logoUrl, baseUrl, cacheBust]);
+    const url = brand.logoUrl || DEFAULT_BRAND.logoUrl; // /logo.png или http(s)://...
+    if (!url) return null;
+    const isAbs = /^https?:\/\//i.test(url);
+    return `${isAbs ? url : url}?v=${cacheBust}`;
+  }, [brand.logoUrl, cacheBust]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
     try {
-      const base = baseUrl || (await getApiBase());
+      const base = await getApiBase();
       const res = await axios.post(`${base}/auth/login`, { login, password });
       const token = res.data.access_token;
       if (!token) throw new Error('Токен не получен');
+
       localStorage.setItem('token', token);
       const decoded: any = jwtDecode(token);
+
       if (decoded.setup && decoded.role === 'admin') navigate('/setup');
       else if (decoded.setup) navigate('/change-password');
       else if (decoded.role === 'admin') navigate('/admin');
@@ -85,24 +92,19 @@ export default function Login() {
       style={{ backgroundImage: "url('/637905880c602930fce335f9a55b3b2f.jpg')" }}
     >
       <div className="bg-white/90 p-10 rounded-2xl shadow-2xl w-full max-w-sm text-center">
-        {/* Логотип сверху */}
-        {logoSrc ? (
+        {logoSrc && (
           <img
             src={logoSrc}
             alt="Логотип"
-            className="mx-auto h-16 w-16 rounded object-contain mb-3"
+            className="h-16 w-16 rounded object-contain mx-auto mb-4"
             onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
+              (e.currentTarget as HTMLImageElement).src = DEFAULT_BRAND.logoUrl || '';
             }}
           />
-        ) : (
-          <div className="mx-auto h-16 w-16 rounded bg-gray-200 flex items-center justify-center text-gray-500 mb-3">
-            <span className="text-sm">∞</span>
-          </div>
         )}
-        {/* Заголовок входа */}
+
         <h2 className="text-2xl font-semibold text-center mb-6">
-          Войти в {brand.name}
+          Войти в {brand.name || DEFAULT_BRAND.name}
         </h2>
 
         {error && <div className="text-red-500 text-center mb-2">{error}</div>}
