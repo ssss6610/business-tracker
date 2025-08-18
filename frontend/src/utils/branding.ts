@@ -5,13 +5,14 @@ export type Branding = { name: string; logoUrl: string | null };
 
 export const DEFAULT_BRANDING: Branding = {
   name: 'Добро пожаловать',
-  logoUrl: null, // можно позже заменить на /assets/placeholder.svg
+  logoUrl: null,
 };
 
 export async function loadBranding(): Promise<Branding> {
+  // 1) публичный серверный эндпоинт
   try {
     const base = await getApiBase();
-    const res = await fetch(`${base}/admin/company`);
+    const res = await fetch(`${base}/public/company`);
     if (res.ok) {
       const data = await res.json();
       return {
@@ -21,6 +22,7 @@ export async function loadBranding(): Promise<Branding> {
     }
   } catch {}
 
+  // 2) фоллбэк локально
   try {
     const raw = localStorage.getItem('companySettings');
     if (raw) {

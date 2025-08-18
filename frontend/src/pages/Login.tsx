@@ -1,58 +1,84 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 import { getApiBase } from '../utils/getApiBase';
-import { loadBranding, DEFAULT_BRANDING } from '../utils/branding';
+
+type Branding = { name: string; logoUrl: string | null };
+
+const DEFAULT_BRAND: Branding = {
+  name: 'Добро пожаловать',
+  logoUrl: null,
+};
 
 export default function Login() {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [brand, setBrand] = useState(DEFAULT_BRANDING);
+  const [brand, setBrand] = useState<Branding>(DEFAULT_BRAND);
+  const [cacheBust, setCacheBust] = useState<number>(Date.now());
+  const [baseUrl, setBaseUrl] = useState<string>('');
   const navigate = useNavigate();
 
-  // грузим бренд для логина + подписка на обновление из персонализации
+  // Загрузка baseUrl и публичного бренда
   useEffect(() => {
-    loadBranding().then(setBrand);
+    (async () => {
+      const base = await getApiBase();
+      setBaseUrl(base);
+      try {
+        const res = await fetch(`${base}/public/company`);
+        if (res.ok) {
+          const data = await res.json();
+          setBrand({
+            name: data?.name || DEFAULT_BRAND.name,
+            logoUrl: data?.logoUrl ?? null, // ожидаем относительный /uploads/... или абсолютный
+          });
+        }
+      } catch {
+        // оставим дефолтный бренд
+      }
+    })();
+  }, []);
 
+  // Реакция на company:updated (после сохранения персонализации)
+  useEffect(() => {
     const onUpdated = (e: Event) => {
       const ce = e as CustomEvent<{ name?: string; logoUrl?: string | null }>;
       setBrand({
-        name: ce.detail?.name || DEFAULT_BRANDING.name,
-        logoUrl: ce.detail?.logoUrl || null,
+        name: ce.detail?.name || DEFAULT_BRAND.name,
+        logoUrl: ce.detail?.logoUrl ?? null,
       });
+      setCacheBust(Date.now());
     };
     window.addEventListener('company:updated', onUpdated as any);
     return () => window.removeEventListener('company:updated', onUpdated as any);
   }, []);
 
+  // Абсолютный src логотипа + cache-buster
+  const logoSrc = useMemo(() => {
+    if (!brand.logoUrl) return null; // 👈 больше не бьёмся в /public/company/logo
+    if (/^https?:\/\//i.test(brand.logoUrl)) return `${brand.logoUrl}?v=${cacheBust}`;
+    const rel = brand.logoUrl.startsWith('/') ? brand.logoUrl : `/${brand.logoUrl}`;
+    return baseUrl ? `${baseUrl}${rel}?v=${cacheBust}` : null;
+  }, [brand.logoUrl, baseUrl, cacheBust]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
     try {
-      const baseUrl = await getApiBase();
-      const res = await axios.post(`${baseUrl}/auth/login`, { login, password });
-
+      const base = baseUrl || (await getApiBase());
+      const res = await axios.post(`${base}/auth/login`, { login, password });
       const token = res.data.access_token;
       if (!token) throw new Error('Токен не получен');
 
       localStorage.setItem('token', token);
-
       const decoded: any = jwtDecode(token);
-      console.log('🔐 Декодированный токен:', decoded);
 
-      if (decoded.setup && decoded.role === 'admin') {
-        navigate('/setup'); // мастер настройки
-      } else if (decoded.setup) {
-        navigate('/change-password'); // смена пароля
-      } else if (decoded.role === 'admin') {
-        navigate('/admin'); // админ-панель
-      } else {
-        navigate('/workspace'); // рабочее пространство
-      }
-    } catch (err: any) {
+      if (decoded.setup && decoded.role === 'admin') navigate('/setup');
+      else if (decoded.setup) navigate('/change-password');
+      else if (decoded.role === 'admin') navigate('/admin');
+      else navigate('/workspace');
+    } catch (err) {
       console.error('❌ Ошибка логина:', err);
       setError('Неверный логин или пароль');
     }
@@ -64,14 +90,16 @@ export default function Login() {
       style={{ backgroundImage: "url('/637905880c602930fce335f9a55b3b2f.jpg')" }}
     >
       <div className="bg-white/90 p-10 rounded-2xl shadow-2xl w-full max-w-sm">
-        {/* Брендинг логина */}
+        {/* Брендинг */}
         <div className="flex items-center gap-3 mb-6 justify-center">
-          {brand.logoUrl ? (
+          {logoSrc ? (
             <img
-              src={brand.logoUrl}
+              src={logoSrc}
               alt="Логотип"
-              className="h-10 w-10 rounded"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              className="h-10 w-10 rounded object-contain"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
             />
           ) : (
             <div className="h-10 w-10 rounded bg-gray-200 flex items-center justify-center text-gray-500">

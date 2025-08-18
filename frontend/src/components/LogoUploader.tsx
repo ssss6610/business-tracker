@@ -1,134 +1,97 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+// src/components/LogoUploader.tsx
+import { useEffect, useMemo, useState } from 'react';
+import { makeAbsoluteUrl } from '../utils/assetUrl';
 
-export type LogoFile = {
-  file: File | null;     // null, если используем только existingUrl
-  preview: string | null; // dataURL для превью локального файла
-};
-
-type Props = {
-  value: LogoFile | null;
-  setValue: (v: LogoFile | null) => void;
-  existingUrl?: string;
-  onRemoveExisting?: () => void;
-  maxSizeMb?: number; // по умолчанию 2 МБ
-};
+type LogoFile = { file: File | null; preview: string | null };
 
 export default function LogoUploader({
   value,
   setValue,
   existingUrl,
   onRemoveExisting,
-  maxSizeMb = 2,
-}: Props) {
-  const [dragOver, setDragOver] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const effectivePreview = useMemo(() => value?.preview ?? existingUrl ?? null, [value, existingUrl]);
+}: {
+  value: LogoFile | null;
+  setValue: (v: LogoFile | null) => void;
+  existingUrl?: string;
+  onRemoveExisting?: () => void;
+}) {
+  // абсолютный URL + cache-buster, чтобы сразу видеть новый файл
+  const resolvedExisting = useMemo(() => {
+    if (!existingUrl) return null;
+    return makeAbsoluteUrl(existingUrl).then((u) =>
+      u ? `${u}?v=${Date.now()}` : null
+    );
+  }, [existingUrl]);
 
-  const pick = useCallback(() => inputRef.current?.click(), []);
-
-  const onFile = useCallback(
-    (file: File) => {
-      const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
-      if (!allowed.includes(file.type)) {
-        alert('Поддерживаются PNG, JPG, SVG');
-        return;
-      }
-      if (file.size > maxSizeMb * 1024 * 1024) {
-        alert(`Файл больше ${maxSizeMb} МБ`);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setValue({ file, preview: String(reader.result) });
-      };
-      reader.readAsDataURL(file);
-    },
-    [maxSizeMb, setValue]
-  );
-
-  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) onFile(f);
+  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setValue({ file, preview: String(reader.result) });
+    reader.readAsDataURL(file);
   };
-
-  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragOver(false);
-    const f = e.dataTransfer.files?.[0];
-    if (f) onFile(f);
-  };
-
-  const clearLocal = () => setValue(null);
-  const removeExisting = () => onRemoveExisting?.();
 
   return (
-    <div className="mt-2">
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
-        className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 text-center transition
-          ${dragOver ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300 hover:border-indigo-300'}
-        `}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && pick()}
-        aria-label="Загрузить логотип"
-      >
-        {effectivePreview ? (
-          <img
-            src={effectivePreview}
-            alt="Логотип"
-            className="h-24 w-24 rounded-md object-contain"
-            draggable={false}
-          />
-        ) : (
-          <div className="text-sm text-gray-500">
-            Перетащите файл сюда или <span className="text-indigo-600 underline">выберите</span>
-          </div>
-        )}
-
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/jpg,image/svg+xml"
-          onChange={onInputChange}
-          className="hidden"
+    <div className="mt-2 rounded-lg border border-dashed border-gray-300 p-6 text-center">
+      {/* превью: новый файл приоритетнее */}
+      {value?.preview ? (
+        <img
+          alt="Логотип"
+          src={value.preview}
+          className="mx-auto h-16 w-16 rounded object-contain"
         />
+      ) : (
+        <AwaitedImg promiseUrl={resolvedExisting} />
+      )}
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-4 flex items-center justify-center gap-3">
+        <label className="cursor-pointer rounded border px-3 py-2 text-sm hover:bg-gray-50">
+          Выбрать файл
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/svg+xml"
+            className="hidden"
+            onChange={onPick}
+          />
+        </label>
+
+        {existingUrl && onRemoveExisting && !value?.file && (
           <button
             type="button"
-            onClick={pick}
-            className="rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
+            onClick={onRemoveExisting}
+            className="rounded bg-rose-100 px-3 py-2 text-sm text-rose-700 hover:bg-rose-200"
           >
-            Выбрать файл
+            Удалить текущий логотип
           </button>
-
-          {value?.file && (
-            <button
-              type="button"
-              onClick={clearLocal}
-              className="rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
-            >
-              Очистить выбор
-            </button>
-          )}
-
-          {!value?.file && effectivePreview && onRemoveExisting && (
-            <button
-              type="button"
-              onClick={removeExisting}
-              className="rounded-md border border-rose-200 px-3 py-1 text-sm text-rose-600 hover:bg-rose-50"
-            >
-              Удалить текущий логотип
-            </button>
-          )}
-        </div>
+        )}
       </div>
     </div>
+  );
+}
+
+/** Вспомогательный компонент, чтобы подождать makeAbsoluteUrl (он async) */
+function AwaitedImg({ promiseUrl }: { promiseUrl: Promise<string | null> | null }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const u = await promiseUrl;
+      if (alive) setUrl(u);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [promiseUrl]);
+
+  if (!url) {
+    return <div className="text-sm text-gray-500">Логотип</div>;
+  }
+  return (
+    <img
+      alt="Логотип"
+      src={url}
+      className="mx-auto h-16 w-16 rounded object-contain"
+    />
   );
 }

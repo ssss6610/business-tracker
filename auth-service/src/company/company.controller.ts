@@ -1,6 +1,6 @@
-// src/company/company.controller.ts
 import {
-  Body, Controller, Get, Put, Post, UploadedFile, UseGuards, UseInterceptors,
+  Body, Controller, Get, Put, Post,
+  UploadedFile, UseGuards, UseInterceptors
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -11,8 +11,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 const uploadDir = join(process.cwd(), 'uploads', 'company-logos');
 
-@Controller('admin/company')
 @UseGuards(JwtAuthGuard)
+@Controller('admin/company')
 export class CompanyController {
   constructor(private readonly service: CompanyService) {}
 
@@ -27,18 +27,39 @@ export class CompanyController {
   }
 
   @Post('logo')
-  @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: uploadDir,
-      filename: (_req, file, cb) => cb(null, `logo_${Date.now()}${extname(file.originalname || '.png')}`),
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: uploadDir,
+        filename: (_req, file, cb) => {
+          const name = 'logo_' + Date.now() + extname(file.originalname || '.png');
+          cb(null, name);
+        },
+      }),
+      limits: { fileSize: 2 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const ok = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'].includes(file.mimetype);
+        cb(ok ? null : new Error('INVALID_TYPE'), ok);
+      },
     }),
-    limits: { fileSize: 2 * 1024 * 1024 },
-    fileFilter: (_req, file, cb) => {
-      const ok = ['image/png','image/jpeg','image/jpg','image/svg+xml'].includes(file.mimetype);
-      cb(ok ? null : new Error('INVALID_TYPE'), ok);
-    },
-  }))
-  upload(@UploadedFile() file: any) {           // 👈 как в ImportController
+  )
+  upload(@UploadedFile() file: any) {
     return { url: `/uploads/company-logos/${file.filename}` };
+  }
+}
+
+/** ПУБЛИЧНЫЙ эндпоинт для экрана логина/лендинга */
+@Controller('public/company')
+export class PublicCompanyController {
+  constructor(private readonly service: CompanyService) {}
+
+  @Get()
+  async getPublic() {
+    const s = await this.service.get();
+    return {
+      name: s.name || 'Добро пожаловать',
+      logoUrl: s.logoUrl || null,
+      departments: s.departments ?? [],
+    };
   }
 }
