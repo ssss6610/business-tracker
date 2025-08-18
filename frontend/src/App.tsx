@@ -26,9 +26,9 @@ import AdminLayout from "./layouts/AdminLayout";
 import { getApiBase } from "./utils/getApiBase";
 import { DEFAULT_BRAND } from "./utils/defaultBranding";
 
-type Branding = { name: string; logoUrl: string | null; faviconUrl: string | null };
+type Branding = { name: string; logoUrl: string | null };
 
-// удалить все иконки и поставить наши (с cache-buster)
+// убрать все имеющиеся иконки и поставить наши (с cache-buster)
 function setFavicons(absUrl: string | null) {
   const selectors =
     'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="mask-icon"]';
@@ -47,23 +47,34 @@ function setFavicons(absUrl: string | null) {
     document.head.appendChild(link);
   };
 
-  // PNG — совместимый вариант
+  // PNG — самый совместимый вариант
   add("icon", "image/png", "32x32");
   add("shortcut icon", "image/png", "32x32");
   add("apple-touch-icon", undefined, "180x180");
+}
+
+// делаем абсолютный URL для логотипа/фавикона
+function toAbsolute(url: string | null, apiBase: string): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  // картинки из бэка
+  if (url.startsWith("/uploads")) return `${apiBase}${url}`;
+  // public-ресурсы фронта (/logo.png, /favicon.png) — оставляем как есть
+  return url;
 }
 
 export default function App() {
   const [brand, setBrand] = useState<Branding>({
     name: DEFAULT_BRAND.name,
     logoUrl: DEFAULT_BRAND.logoUrl,
-    faviconUrl: DEFAULT_BRAND.faviconUrl,
   });
+  const [apiBase, setApiBase] = useState<string>(window.location.origin);
 
   // первичная загрузка брендинга
   useEffect(() => {
     (async () => {
       const base = await getApiBase();
+      setApiBase(base);
       try {
         const res = await fetch(`${base}/public/company`);
         if (res.ok) {
@@ -71,11 +82,10 @@ export default function App() {
           setBrand({
             name: data?.name || DEFAULT_BRAND.name,
             logoUrl: data?.logoUrl ?? DEFAULT_BRAND.logoUrl,
-            faviconUrl: data?.faviconUrl ?? DEFAULT_BRAND.faviconUrl, // может отсутствовать на бэке
           });
         }
       } catch {
-        // остаёмся на дефолтах
+        // оставим дефолт
       }
     })();
   }, []);
@@ -83,26 +93,24 @@ export default function App() {
   // обновление из персонализации (CompanySettings)
   useEffect(() => {
     const onUpdated = (e: Event) => {
-      const ce = e as CustomEvent<{ name?: string; logoUrl?: string | null; faviconUrl?: string | null }>;
+      const ce = e as CustomEvent<{ name?: string; logoUrl?: string | null }>;
       setBrand((prev) => ({
         name: ce.detail?.name || prev.name,
         logoUrl: ce.detail?.logoUrl ?? prev.logoUrl ?? DEFAULT_BRAND.logoUrl,
-        faviconUrl: ce.detail?.faviconUrl ?? prev.faviconUrl ?? DEFAULT_BRAND.faviconUrl,
       }));
     };
     window.addEventListener("company:updated", onUpdated as any);
     return () => window.removeEventListener("company:updated", onUpdated as any);
   }, []);
 
-  // глобально title + favicon
+  // глобально title + favicon (берём logoUrl как favicon, если отдельной нет)
   useEffect(() => {
     document.title = brand.name || DEFAULT_BRAND.name;
-    // faviconUrl хранится как public-путь: /favicon.png или полный URL
-    const abs = brand.faviconUrl?.startsWith("http")
-      ? brand.faviconUrl
-      : brand.faviconUrl || DEFAULT_BRAND.faviconUrl; // /favicon.png
+
+    const faviconCandidate = brand.logoUrl || DEFAULT_BRAND.faviconUrl;
+    const abs = toAbsolute(faviconCandidate, apiBase) || DEFAULT_BRAND.faviconUrl;
     setFavicons(abs);
-  }, [brand.name, brand.faviconUrl]);
+  }, [brand.name, brand.logoUrl, apiBase]);
 
   return (
     <BrowserRouter>

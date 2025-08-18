@@ -7,6 +7,13 @@ import { DEFAULT_BRAND } from '../utils/defaultBranding';
 
 type Branding = { name: string; logoUrl: string | null };
 
+function toAbsolute(url: string | null, apiBase: string): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith('/uploads')) return `${apiBase}${url}`;
+  return url; // public (/logo.png)
+}
+
 export default function Login() {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
@@ -16,11 +23,13 @@ export default function Login() {
     logoUrl: DEFAULT_BRAND.logoUrl,
   });
   const [cacheBust, setCacheBust] = useState<number>(Date.now());
+  const [apiBase, setApiBase] = useState<string>(window.location.origin);
   const navigate = useNavigate();
 
   useEffect(() => {
     (async () => {
       const base = await getApiBase();
+      setApiBase(base);
       try {
         const res = await fetch(`${base}/public/company`);
         if (res.ok) {
@@ -55,13 +64,11 @@ export default function Login() {
     document.title = brand.name || DEFAULT_BRAND.name;
   }, [brand.name]);
 
-  // логотип: если пришёл абсолютный URL — используем его, иначе public-путь
+  // делаем абсолютный src + cache-buster
   const logoSrc = useMemo(() => {
-    const url = brand.logoUrl || DEFAULT_BRAND.logoUrl; // /logo.png или http(s)://...
-    if (!url) return null;
-    const isAbs = /^https?:\/\//i.test(url);
-    return `${isAbs ? url : url}?v=${cacheBust}`;
-  }, [brand.logoUrl, cacheBust]);
+    const abs = toAbsolute(brand.logoUrl || DEFAULT_BRAND.logoUrl, apiBase);
+    return abs ? `${abs}${abs.includes('?') ? '&' : '?'}v=${cacheBust}` : null;
+  }, [brand.logoUrl, apiBase, cacheBust]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +105,7 @@ export default function Login() {
             alt="Логотип"
             className="h-16 w-16 rounded object-contain mx-auto mb-4"
             onError={(e) => {
-              (e.currentTarget as HTMLImageElement).src = DEFAULT_BRAND.logoUrl || '';
+              (e.currentTarget as HTMLImageElement).src = DEFAULT_BRAND.logoUrl;
             }}
           />
         )}
