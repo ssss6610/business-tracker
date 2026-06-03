@@ -1,32 +1,28 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UserService } from '../user/user.service';
 import * as bcrypt from 'bcryptjs';
-import { ChangePasswordDto } from './dto/change-password.dto';
+
+import { UserService } from '../user/user.service';
 import { Role } from '../user/user.entity/user.entity';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private userService: UserService,
-    private jwtService: JwtService
+    private readonly userService: UserService,
+    private readonly jwtService: JwtService,
   ) {}
 
-  async validateUser(login: string, pass: string) {
-    console.log('🧪 Проверка логина:', login);
+  async validateUser(login: string, password: string) {
     const user = await this.userService.findByLogin(login);
-    console.log('🔍 Найден пользователь:', user);
 
     if (!user) {
-      console.warn('❌ Пользователь не найден');
       return null;
     }
 
-    const match = await bcrypt.compare(pass, user.password);
-    console.log('🔐 Совпадение пароля:', match);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
-    if (!match) {
-      console.warn('❌ Пароль не совпадает');
+    if (!isPasswordValid) {
       return null;
     }
 
@@ -34,16 +30,19 @@ export class AuthService {
   }
 
   async login(login: string, password: string) {
-    console.log('⚡ login() вызван с login:', login);
     const user = await this.validateUser(login, password);
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    if (!user) {
+      throw new UnauthorizedException('Неверный логин или пароль');
+    }
 
     const payload = {
       sub: user.id,
       role: user.role,
-      setup: user.role === Role.Admin
-        ? !user.isInitialSetupCompleted
-        : user.mustChangePassword,
+      setup:
+        user.role === Role.Admin
+          ? !user.isInitialSetupCompleted
+          : user.mustChangePassword,
     };
 
     return {
@@ -54,13 +53,20 @@ export class AuthService {
   async changePassword(userId: number, dto: ChangePasswordDto) {
     const user = await this.userService.findById(userId);
 
-    const isMatch = await bcrypt.compare(dto.oldPassword, user.password);
-    if (!isMatch) {
-      throw new Error('Старый пароль неверный');
+    if (!user) {
+      throw new UnauthorizedException('Пользователь не найден');
     }
 
-    const hashed = await bcrypt.hash(dto.newPassword, 10);
-    user.password = hashed;
+    const isOldPasswordValid = await bcrypt.compare(
+      dto.oldPassword,
+      user.password,
+    );
+
+    if (!isOldPasswordValid) {
+      throw new UnauthorizedException('Старый пароль неверный');
+    }
+
+    user.password = await bcrypt.hash(dto.newPassword, 10);
     user.mustChangePassword = false;
     user.isInitialSetupCompleted = true;
 
@@ -76,4 +82,4 @@ export class AuthService {
       access_token: this.jwtService.sign(payload),
     };
   }
-} // ← ← ← вот эта скобка была пропущена
+}
