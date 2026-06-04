@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import * as si from 'systeminformation';
-import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { InjectRepository } from '@nestjs/typeorm';

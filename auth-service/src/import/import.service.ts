@@ -1,55 +1,49 @@
 import { Injectable } from '@nestjs/common';
-import { ImportedUserDto } from './dto/imported-user.dto';
 import { CreateUserDto } from '../user/dto/create-user.dto';
-import { UserService } from '../user/user.service';
-import { normalizeUser } from './utils/normalize-user.util';
 import { Role, UserType } from '../user/user.entity/user.entity';
+import { UserService } from '../user/user.service';
+import { ImportedUserDto } from './dto/imported-user.dto';
 import { parseEmployeeXls } from './parsers/bitrix.parser';
 import { parseClientsCsv } from './parsers/clients.parser';
-import { Express } from 'express';
+import { normalizeUser } from './utils/normalize-user.util';
+
 @Injectable()
 export class ImportService {
   constructor(private readonly userService: UserService) {}
 
-  async previewBitrix(file: any): Promise<ImportedUserDto[]> {
-    const raw = await parseEmployeeXls(file.path); // или file.buffer
-    return raw.map(normalizeUser); // если normalizeUser есть
+  previewBitrix(file: Express.Multer.File): ImportedUserDto[] {
+    const raw = parseEmployeeXls(file.path);
+    return raw.map(normalizeUser);
   }
 
   async importAndCreateUsers(users: ImportedUserDto[]) {
     const created: CreateUserDto[] = [];
-
     const tempPassword = 'temp12345';
 
     for (const raw of users) {
       const normalized = normalizeUser(raw);
-      console.log('📦 Normalized:', normalized); // 👈 ДОБАВЬ ЭТО
 
       if (!normalized.email || !normalized.fullName) {
-        console.warn('⛔ Пропущен (нет email или fullName):', normalized);
         continue;
       }
 
-      const login = normalized.email.split('@')[0];
-      const role: Role = Role.User;
-      const userType: UserType = UserType.Employee;
-
       const dto: CreateUserDto = {
-        login,
+        login: normalized.email.split('@')[0],
         email: normalized.email,
         password: tempPassword,
-        role,
-        userType, // 👈 ОБЯЗАТЕЛЬНО если ты используешь это в сущности
+        role: Role.User,
+        userType: UserType.Employee,
         mustChangePassword: true,
       };
-
-      console.log('🛠️ DTO:', dto); // 👈 ДОБАВЬ ЭТО
 
       try {
         await this.userService.create(dto);
         created.push(dto);
-      } catch (e) {
-        console.warn('❌ Ошибка при создании пользователя:', dto, e.message);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
+
+        console.warn('Ошибка при создании пользователя:', dto, message);
       }
     }
 
@@ -58,7 +52,8 @@ export class ImportService {
       users: created,
     };
   }
-  async previewClients(file: any): Promise<ImportedUserDto[]> {
+
+  async previewClients(file: Express.Multer.File): Promise<ImportedUserDto[]> {
     const raw = await parseClientsCsv(file.path);
     return raw.map(normalizeUser);
   }
@@ -69,22 +64,28 @@ export class ImportService {
 
     for (const raw of users) {
       const normalized = normalizeUser(raw);
-      if (!normalized.email || !normalized.fullName) continue;
+
+      if (!normalized.email || !normalized.fullName) {
+        continue;
+      }
 
       const dto: CreateUserDto = {
         login: normalized.email.split('@')[0],
         email: normalized.email,
         password: tempPassword,
         role: Role.User,
+        userType: UserType.Client,
         mustChangePassword: true,
-        userType: UserType.Client, // 👈 отличие от сотрудников
       };
 
       try {
         await this.userService.create(dto);
         created.push(dto);
-      } catch (e) {
-        console.warn('Ошибка при создании клиента:', dto, e.message);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
+
+        console.warn('Ошибка при создании клиента:', dto, message);
       }
     }
 

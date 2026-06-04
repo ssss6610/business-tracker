@@ -10,7 +10,9 @@ interface AuthRequest {
     role: string;
     setup: boolean;
   };
-}X@Controller('auth')
+}
+
+@Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
