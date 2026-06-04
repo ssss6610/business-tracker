@@ -9,28 +9,33 @@ import { UpsertTrackerRoleDto } from './dto/upsert-role.dto';
 export class TrackerService {
   constructor(
     @InjectRepository(TrackerRole) private roles: Repository<TrackerRole>,
-    @InjectRepository(TrackerPermission) private perms: Repository<TrackerPermission>,
+    @InjectRepository(TrackerPermission)
+    private perms: Repository<TrackerPermission>,
   ) {}
 
   // Permissions
-  listPermissions() { return this.perms.find(); }
+  listPermissions() {
+    return this.perms.find();
+  }
   async seedPermissionsIfEmpty() {
     const count = await this.perms.count();
     if (count) return;
     const base = [
       { code: 'task.create', name: 'Создавать задачи' },
       { code: 'task.assign', name: 'Назначать исполнителей' },
-      { code: 'task.edit',   name: 'Редактировать задачи' },
-      { code: 'task.view',   name: 'Просматривать задачи' },
-      { code: 'task.comment',name: 'Комментировать' },
-      { code: 'board.manage',name: 'Управлять досками' },
+      { code: 'task.edit', name: 'Редактировать задачи' },
+      { code: 'task.view', name: 'Просматривать задачи' },
+      { code: 'task.comment', name: 'Комментировать' },
+      { code: 'board.manage', name: 'Управлять досками' },
       { code: 'report.view', name: 'Просматривать отчёты' },
     ];
     await this.perms.save(base);
   }
 
   // Roles
-  listRoles() { return this.roles.find(); }
+  listRoles() {
+    return this.roles.find();
+  }
 
   async upsertRole(dto: UpsertTrackerRoleDto) {
     const permissions = dto.permissionIds?.length

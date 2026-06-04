@@ -2,7 +2,9 @@ import * as fs from 'fs';
 import * as csv from 'csv-parser';
 import { ImportedUserDto } from '../dto/imported-user.dto';
 
-export async function parseClientsCsv(filePath: string): Promise<ImportedUserDto[]> {
+export async function parseClientsCsv(
+  filePath: string,
+): Promise<ImportedUserDto[]> {
   const users: ImportedUserDto[] = [];
 
   return new Promise((resolve, reject) => {

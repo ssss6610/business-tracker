@@ -9,7 +9,9 @@ import getPort from 'get-port';
 import { join } from 'path';
 
 async function bootstrap() {
-  const port = await getPort({ port: Array.from({ length: 100 }, (_, i) => 3000 + i) });
+  const port = await getPort({
+    port: Array.from({ length: 100 }, (_, i) => 3000 + i),
+  });
 
   // мини‑сервер для /api-info
   const infoApp = express();

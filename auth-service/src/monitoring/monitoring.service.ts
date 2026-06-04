@@ -26,7 +26,6 @@ export class MonitoringService {
     private readonly thresholdRepo: Repository<Threshold>,
     private readonly checker: ThresholdCheckerService, // ⬅️ новый DI
   ) {}
-  
 
   async getStats() {
     const [cpuLoad, memory, disks] = await Promise.all([
@@ -38,13 +37,19 @@ export class MonitoringService {
     const cpu = parseFloat(cpuLoad.currentLoad.toFixed(1));
     const ramUsed = +(memory.used / 1024 / 1024 / 1024).toFixed(2);
     const ramTotal = +(memory.total / 1024 / 1024 / 1024).toFixed(2);
-    const ramPercent = +(ramUsed / ramTotal * 100).toFixed(1);
+    const ramPercent = +((ramUsed / ramTotal) * 100).toFixed(1);
 
-    const diskUsed = disks[0] ? +(disks[0].used / 1024 / 1024 / 1024).toFixed(2) : null;
-    const diskTotal = disks[0] ? +(disks[0].size / 1024 / 1024 / 1024).toFixed(2) : null;
+    const diskUsed = disks[0]
+      ? +(disks[0].used / 1024 / 1024 / 1024).toFixed(2)
+      : null;
+    const diskTotal = disks[0]
+      ? +(disks[0].size / 1024 / 1024 / 1024).toFixed(2)
+      : null;
 
     // 🔥 Пороговые уведомления
-    const cpuThreshold = await this.thresholdRepo.findOne({ where: { type: 'cpu' } });
+    const cpuThreshold = await this.thresholdRepo.findOne({
+      where: { type: 'cpu' },
+    });
     if (cpuThreshold && cpu > cpuThreshold.value) {
       await this.alertRepo.save({
         type: 'cpu',
@@ -55,7 +60,9 @@ export class MonitoringService {
       await this.checker.check('ram', ramPercent);
     }
 
-    const ramThreshold = await this.thresholdRepo.findOne({ where: { type: 'ram' } });
+    const ramThreshold = await this.thresholdRepo.findOne({
+      where: { type: 'ram' },
+    });
     if (ramThreshold && ramPercent > ramThreshold.value) {
       await this.alertRepo.save({
         type: 'ram',
@@ -76,41 +83,43 @@ export class MonitoringService {
     return {
       cpuUsage: `${cpu}%`,
       memoryUsage: `${ramUsed} GB / ${ramTotal} GB`,
-      diskUsage: diskUsed !== null ? `${diskUsed} GB / ${diskTotal} GB` : '🔒 Недоступно',
+      diskUsage:
+        diskUsed !== null
+          ? `${diskUsed} GB / ${diskTotal} GB`
+          : '🔒 Недоступно',
       services: await this.checkServices(),
       timestamp: new Date().toISOString(),
     };
   }
 
-
   async getTopProcesses() {
-  const [cpuProcs, memProcs] = await Promise.all([
-    si.processes(),
-    si.processes(), // один вызов даст и CPU, и RAM
-  ]);
+    const [cpuProcs, memProcs] = await Promise.all([
+      si.processes(),
+      si.processes(), // один вызов даст и CPU, и RAM
+    ]);
 
-  const byCpu = cpuProcs.list
-    .filter(p => p.cpu > 0)
-    .sort((a, b) => b.cpu - a.cpu)
-    .slice(0, 5)
-    .map(p => ({
-      pid: p.pid,
-      name: p.name,
-      cpu: p.cpu.toFixed(1),
-    }));
+    const byCpu = cpuProcs.list
+      .filter((p) => p.cpu > 0)
+      .sort((a, b) => b.cpu - a.cpu)
+      .slice(0, 5)
+      .map((p) => ({
+        pid: p.pid,
+        name: p.name,
+        cpu: p.cpu.toFixed(1),
+      }));
 
-  const byRam = memProcs.list
-    .filter(p => p.memRss > 0)
-    .sort((a, b) => b.memRss - a.memRss)
-    .slice(0, 5)
-    .map(p => ({
-      pid: p.pid,
-      name: p.name,
-      ramMB: (p.memRss / 1024 / 1024).toFixed(2),
-    }));
+    const byRam = memProcs.list
+      .filter((p) => p.memRss > 0)
+      .sort((a, b) => b.memRss - a.memRss)
+      .slice(0, 5)
+      .map((p) => ({
+        pid: p.pid,
+        name: p.name,
+        ramMB: (p.memRss / 1024 / 1024).toFixed(2),
+      }));
 
-  return { byCpu, byRam };
-}
+    return { byCpu, byRam };
+  }
 
   async getAlerts() {
     return this.alertRepo.find({
@@ -137,8 +146,8 @@ export class MonitoringService {
   async checkServices() {
     const results: Record<string, string> = {};
 
-    const redis = await this.pingPort(6379) ? 'работает' : 'нет связи';
-    const db = await this.pingPort(5433) ? 'работает' : 'нет связи';
+    const redis = (await this.pingPort(6379)) ? 'работает' : 'нет связи';
+    const db = (await this.pingPort(5433)) ? 'работает' : 'нет связи';
     const auth = await this.checkDockerContainer('auth-service');
     const user = await this.checkDockerContainer('user-service');
 

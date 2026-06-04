@@ -11,4 +11,3 @@ import { UserController } from './user.controller';
   exports: [UserService], // ⬅️ экспортируем, чтобы другие модули могли использовать
 })
 export class UserModule {}
-

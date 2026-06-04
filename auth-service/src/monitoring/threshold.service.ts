@@ -18,7 +18,9 @@ export class ThresholdService {
 
   // Установить порог по типу
   async setThreshold(type: string, value: number) {
-    const existing = await this.repo.findOne({ where: { type: type as 'cpu' | 'ram' } });
+    const existing = await this.repo.findOne({
+      where: { type: type as 'cpu' | 'ram' },
+    });
 
     if (existing) {
       existing.value = value;
@@ -30,7 +32,9 @@ export class ThresholdService {
 
   // Удалить порог
   async deleteThreshold(type: string) {
-    const existing = await this.repo.findOne({ where: { type: type as 'cpu' | 'ram' } });
+    const existing = await this.repo.findOne({
+      where: { type: type as 'cpu' | 'ram' },
+    });
     if (existing) {
       return this.repo.remove(existing);
     }

@@ -1,7 +1,9 @@
 import * as xlsx from 'xlsx';
 import { ImportedUserDto } from '../dto/imported-user.dto';
 
-export async function parseEmployeeXls(filePath: string): Promise<ImportedUserDto[]> {
+export async function parseEmployeeXls(
+  filePath: string,
+): Promise<ImportedUserDto[]> {
   const workbook = xlsx.readFile(filePath);
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = xlsx.utils.sheet_to_json<any>(sheet);
@@ -11,9 +13,9 @@ export async function parseEmployeeXls(filePath: string): Promise<ImportedUserDt
   const users: ImportedUserDto[] = rows.map((row) => ({
     externalId: row.ID || '',
     fullName: row['Имя и фамилия'] || row['Сотрудник'] || '', // ✅
-    email: row['E-Mail'] || '',                               // ✅
+    email: row['E-Mail'] || '', // ✅
     position: '', // в файле нет → оставим пустым
-    department: row['Подразделение'] || '',                   // ✅
+    department: row['Подразделение'] || '', // ✅
     source: 'bitrix24',
     userType: 'employee',
   }));

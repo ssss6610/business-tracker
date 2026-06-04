@@ -30,11 +30,11 @@ export class MonitoringController {
   @Get('services/:name/history')
   @Roles(Role.Admin)
   getServiceHistory(@Param('name') name: string) {
-   return this.monitoringService.getServiceHistory(name);
+    return this.monitoringService.getServiceHistory(name);
   }
   @Get('top-processes')
-@ Roles(Role.Admin)
- getTopProcesses() {
-  return this.monitoringService.getTopProcesses();
-}
+  @Roles(Role.Admin)
+  getTopProcesses() {
+    return this.monitoringService.getTopProcesses();
+  }
 }

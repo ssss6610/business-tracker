@@ -12,5 +12,7 @@ import { TrackerController } from './tracker.controller';
 })
 export class TrackerModule implements OnModuleInit {
   constructor(private readonly service: TrackerService) {}
-  async onModuleInit() { await this.service.seedPermissionsIfEmpty(); }
+  async onModuleInit() {
+    await this.service.seedPermissionsIfEmpty();
+  }
 }

@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
 import { User, Role, UserType } from './user.entity/user.entity';
@@ -15,8 +19,8 @@ export class UserService {
 
   // совместимость со старыми вызовами
   async save(user: User): Promise<User> {
-  return this.userRepository.save(user);
- }
+    return this.userRepository.save(user);
+  }
 
   // --- базовые методы ---
 
@@ -28,7 +32,9 @@ export class UserService {
     const hashed = await bcrypt.hash(password, 10);
 
     // если админ уже есть — вернём его (на всякий)
-    const existing = await this.userRepository.findOne({ where: { role: Role.Admin } });
+    const existing = await this.userRepository.findOne({
+      where: { role: Role.Admin },
+    });
     if (existing) return existing;
 
     const admin = this.userRepository.create({
@@ -48,7 +54,10 @@ export class UserService {
   }
 
   async findById(id: number): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id }, relations: ['trackerRole'] });
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['trackerRole'],
+    });
     if (!user) throw new NotFoundException('Пользователь не найден');
     return user;
   }
@@ -62,13 +71,21 @@ export class UserService {
 
   async create(dto: CreateUserDto): Promise<User> {
     // уникальность логина/почты
-    const byLogin = await this.userRepository.findOne({ where: { login: dto.login } });
+    const byLogin = await this.userRepository.findOne({
+      where: { login: dto.login },
+    });
     if (byLogin) {
-      throw new BadRequestException('Пользователь с таким логином уже существует');
+      throw new BadRequestException(
+        'Пользователь с таким логином уже существует',
+      );
     }
-    const byEmail = await this.userRepository.findOne({ where: { email: dto.email } });
+    const byEmail = await this.userRepository.findOne({
+      where: { email: dto.email },
+    });
     if (byEmail) {
-      throw new BadRequestException('Пользователь с таким email уже существует');
+      throw new BadRequestException(
+        'Пользователь с таким email уже существует',
+      );
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -80,10 +97,10 @@ export class UserService {
       password: hashedPassword,
 
       // новые поля
-      userType: dto.userType ?? UserType.Employee,           // по умолчанию сотрудник
+      userType: dto.userType ?? UserType.Employee, // по умолчанию сотрудник
       trackerRoleId: dto.trackerRoleId ?? null,
       department: dto.department ?? null,
-      mustChangePassword: dto.mustChangePassword ?? true,     // при создании требуем смену
+      mustChangePassword: dto.mustChangePassword ?? true, // при создании требуем смену
     });
 
     return this.userRepository.save(user);
@@ -95,13 +112,17 @@ export class UserService {
 
     // если меняем логин — проверить уникальность
     if (dto.login && dto.login !== user.login) {
-      const exists = await this.userRepository.findOne({ where: { login: dto.login, id: Not(id) } });
+      const exists = await this.userRepository.findOne({
+        where: { login: dto.login, id: Not(id) },
+      });
       if (exists) throw new BadRequestException('Логин уже занят');
     }
 
     // если меняем email — проверить уникальность
     if (dto.email && dto.email !== user.email) {
-      const exists = await this.userRepository.findOne({ where: { email: dto.email, id: Not(id) } });
+      const exists = await this.userRepository.findOne({
+        where: { email: dto.email, id: Not(id) },
+      });
       if (exists) throw new BadRequestException('Email уже занят');
     }
 
@@ -117,9 +138,15 @@ export class UserService {
       ...(dto.email !== undefined ? { email: dto.email } : {}),
       ...(dto.role !== undefined ? { role: dto.role } : {}),
       ...(dto.userType !== undefined ? { userType: dto.userType } : {}),
-      ...(dto.department !== undefined ? { department: dto.department ?? null } : {}),
-      ...(dto.trackerRoleId !== undefined ? { trackerRoleId: dto.trackerRoleId ?? null } : {}),
-      ...(dto.mustChangePassword !== undefined ? { mustChangePassword: dto.mustChangePassword } : {}),
+      ...(dto.department !== undefined
+        ? { department: dto.department ?? null }
+        : {}),
+      ...(dto.trackerRoleId !== undefined
+        ? { trackerRoleId: dto.trackerRoleId ?? null }
+        : {}),
+      ...(dto.mustChangePassword !== undefined
+        ? { mustChangePassword: dto.mustChangePassword }
+        : {}),
       ...(hashedPassword ? { password: hashedPassword } : {}),
     };
 

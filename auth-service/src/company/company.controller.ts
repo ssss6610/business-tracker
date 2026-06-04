@@ -1,6 +1,12 @@
 import {
-  Body, Controller, Get, Put, Post,
-  UploadedFile, UseGuards, UseInterceptors
+  Body,
+  Controller,
+  Get,
+  Put,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -32,13 +38,19 @@ export class CompanyController {
       storage: diskStorage({
         destination: uploadDir,
         filename: (_req, file, cb) => {
-          const name = 'logo_' + Date.now() + extname(file.originalname || '.png');
+          const name =
+            'logo_' + Date.now() + extname(file.originalname || '.png');
           cb(null, name);
         },
       }),
       limits: { fileSize: 2 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
-        const ok = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'].includes(file.mimetype);
+        const ok = [
+          'image/png',
+          'image/jpeg',
+          'image/jpg',
+          'image/svg+xml',
+        ].includes(file.mimetype);
         cb(ok ? null : new Error('INVALID_TYPE'), ok);
       },
     }),

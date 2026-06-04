@@ -14,7 +14,7 @@ export class SetupController {
   @Post()
   async setupAdmin(
     @Body() dto: { email: string; password: string },
-    @Request() req: any
+    @Request() req: any,
   ) {
     console.log('🧪 user from request:', req.user);
 

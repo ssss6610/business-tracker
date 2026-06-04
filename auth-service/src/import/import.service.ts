@@ -12,85 +12,85 @@ export class ImportService {
   constructor(private readonly userService: UserService) {}
 
   async previewBitrix(file: any): Promise<ImportedUserDto[]> {
-  const raw = await parseEmployeeXls(file.path); // или file.buffer
-  return raw.map(normalizeUser); // если normalizeUser есть
-}
+    const raw = await parseEmployeeXls(file.path); // или file.buffer
+    return raw.map(normalizeUser); // если normalizeUser есть
+  }
 
   async importAndCreateUsers(users: ImportedUserDto[]) {
     const created: CreateUserDto[] = [];
 
     const tempPassword = 'temp12345';
 
-for (const raw of users) {
-  const normalized = normalizeUser(raw);
-  console.log('📦 Normalized:', normalized); // 👈 ДОБАВЬ ЭТО
+    for (const raw of users) {
+      const normalized = normalizeUser(raw);
+      console.log('📦 Normalized:', normalized); // 👈 ДОБАВЬ ЭТО
 
-  if (!normalized.email || !normalized.fullName) {
-    console.warn('⛔ Пропущен (нет email или fullName):', normalized);
-    continue;
-  }
+      if (!normalized.email || !normalized.fullName) {
+        console.warn('⛔ Пропущен (нет email или fullName):', normalized);
+        continue;
+      }
 
-  const login = normalized.email.split('@')[0];
-  const role: Role = Role.User;
-  const userType: UserType = UserType.Employee;
+      const login = normalized.email.split('@')[0];
+      const role: Role = Role.User;
+      const userType: UserType = UserType.Employee;
 
-  const dto: CreateUserDto = {
-    login,
-    email: normalized.email,
-    password: tempPassword,
-    role,
-    userType,                // 👈 ОБЯЗАТЕЛЬНО если ты используешь это в сущности
-    mustChangePassword: true,
-  };
+      const dto: CreateUserDto = {
+        login,
+        email: normalized.email,
+        password: tempPassword,
+        role,
+        userType, // 👈 ОБЯЗАТЕЛЬНО если ты используешь это в сущности
+        mustChangePassword: true,
+      };
 
-  console.log('🛠️ DTO:', dto); // 👈 ДОБАВЬ ЭТО
+      console.log('🛠️ DTO:', dto); // 👈 ДОБАВЬ ЭТО
 
-  try {
-    await this.userService.create(dto);
-    created.push(dto);
-  } catch (e) {
-    console.warn('❌ Ошибка при создании пользователя:', dto, e.message);
-  }
-}
+      try {
+        await this.userService.create(dto);
+        created.push(dto);
+      } catch (e) {
+        console.warn('❌ Ошибка при создании пользователя:', dto, e.message);
+      }
+    }
 
     return {
       count: created.length,
       users: created,
     };
   }
-  async previewClients(file:any): Promise<ImportedUserDto[]> {
-  const raw = await parseClientsCsv(file.path);
-  return raw.map(normalizeUser);
-}
-
-async importClients(users: ImportedUserDto[]) {
-  const created: CreateUserDto[] = [];
-  const tempPassword = 'temp12345';
-
-  for (const raw of users) {
-    const normalized = normalizeUser(raw);
-    if (!normalized.email || !normalized.fullName) continue;
-
-    const dto: CreateUserDto = {
-      login: normalized.email.split('@')[0],
-      email: normalized.email,
-      password: tempPassword,
-      role: Role.User,
-      mustChangePassword: true,
-      userType: UserType.Client, // 👈 отличие от сотрудников
-    };
-
-    try {
-      await this.userService.create(dto);
-      created.push(dto);
-    } catch (e) {
-      console.warn('Ошибка при создании клиента:', dto, e.message);
-    }
+  async previewClients(file: any): Promise<ImportedUserDto[]> {
+    const raw = await parseClientsCsv(file.path);
+    return raw.map(normalizeUser);
   }
 
-  return {
-    count: created.length,
-    users: created,
-  };
-}
+  async importClients(users: ImportedUserDto[]) {
+    const created: CreateUserDto[] = [];
+    const tempPassword = 'temp12345';
+
+    for (const raw of users) {
+      const normalized = normalizeUser(raw);
+      if (!normalized.email || !normalized.fullName) continue;
+
+      const dto: CreateUserDto = {
+        login: normalized.email.split('@')[0],
+        email: normalized.email,
+        password: tempPassword,
+        role: Role.User,
+        mustChangePassword: true,
+        userType: UserType.Client, // 👈 отличие от сотрудников
+      };
+
+      try {
+        await this.userService.create(dto);
+        created.push(dto);
+      } catch (e) {
+        console.warn('Ошибка при создании клиента:', dto, e.message);
+      }
+    }
+
+    return {
+      count: created.length,
+      users: created,
+    };
+  }
 }

@@ -6,6 +6,6 @@ import { UserModule } from '../user/user.module'; // ✅ импортируем 
 @Module({
   imports: [UserModule], // ✅ добавляем сюда
   controllers: [SetupController],
-  providers: [SetupService]
+  providers: [SetupService],
 })
 export class SetupModule {}
