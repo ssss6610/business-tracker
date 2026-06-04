@@ -4,6 +4,14 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 
+interface AuthRequest {
+  user: {
+    id: number;
+    role: string;
+    setup: boolean;
+  };
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -15,7 +23,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('change-password')
-  changePassword(@Body() dto: ChangePasswordDto, @Req() req) {
+  changePassword(@Body() dto: ChangePasswordDto, @Req() req: AuthRequest) {
     return this.authService.changePassword(req.user.id, dto);
   }
 }
