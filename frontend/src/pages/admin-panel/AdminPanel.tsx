@@ -196,7 +196,7 @@ export default function AdminPanel() {
 
       const rows = Array.isArray(res.data) ? res.data : (res.data?.preview ?? []);
       if (!rows.length) {
-        setError('Файл загружен, но данные не распознаны. Убедитесь, что это XLS/XLSX из Bitrix24.');
+        setError('Файл загружен, но данные не распознаны. Убедитесь, что это CSV из Bitrix24.');
       }
       setPreviewUsers(rows);
     } catch (err: any) {
@@ -525,7 +525,7 @@ export default function AdminPanel() {
 
         {selectedSource === 'bitrix24' && (
           <div className="flex items-center gap-2 text-blue-600 mb-2">
-            <SiBraintree size={20} /> <span>Импорт из Bitrix24 (XLS/XLSX)</span>
+            <SiBraintree size={20} /> <span>Импорт из Bitrix24 (CSV)</span>
           </div>
         )}
         {selectedSource === 'trackstudio' && (

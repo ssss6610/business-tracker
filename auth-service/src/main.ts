@@ -2,7 +2,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as express from 'express';
-import { json, NextFunction, Request, Response, urlencoded } from 'express';
+import { json, Request, Response, urlencoded } from 'express';
 import getPort from 'get-port';
 import { join } from 'path';
 import { AppModule } from './app.module';
@@ -47,12 +47,6 @@ async function bootstrap() {
     await userService.createAdmin(tempPassword);
     console.log(`TEMP ADMIN CREATED:\nLogin: adm\nPassword: ${tempPassword}`);
   }
-
-  app.use((req: Request, _res: Response, next: NextFunction) => {
-    console.log(`${req.method} ${req.url}`);
-    next();
-  });
-
   await app.listen(port);
   console.log(`Server started on http://localhost:${port}`);
 }
